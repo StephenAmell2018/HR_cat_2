@@ -131,6 +131,11 @@ int HR_cat_2::btn1_clicked(){
        ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
        ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
 
+       image_origin=MatToQImage(frame);
+       ui->label->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+       ui->label->setPixmap(QPixmap::fromImage(image_origin));//将视频显示到label上
+
+
        if( waitKey(30) == 27 )//ESC键退出
            stop = true;
    }

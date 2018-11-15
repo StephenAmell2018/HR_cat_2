@@ -20,7 +20,7 @@ class HR_cat_2 : public QMainWindow
     Q_OBJECT
 
 public:
-    QImage  image;
+    QImage  image,image_origin;
     explicit HR_cat_2(QWidget *parent = 0);
     QImage MatToQImage(const cv::Mat& mat);
     ~HR_cat_2();
