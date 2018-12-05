@@ -36,3 +36,9 @@ HEADERS += \
 
 FORMS += \
         hr_cat_2.ui
+
+RESOURCES += \
+    1.qrc \
+    1.qrc
+
+DISTFILES +=
