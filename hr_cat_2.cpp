@@ -54,6 +54,44 @@ void HR_cat_2::onMouse( int event, int x, int y, int, void* )
     }
 }
 
+//用于心率核心提取的相关算法
+double HR_cat_2::corr2(Mat a,Mat b){
+    Mat mean_A,mean_B;
+    Mat stddev_1,stddev_2;
+
+  meanStdDev(a,mean_A,stddev_1);
+  meanStdDev(b,mean_B,stddev_2);
+
+  float value_A = mean_A.at<double>(0, 0);
+  float value_B = mean_B.at<double>(0, 0);
+
+  cout<<"meanA = "<<value_A<<endl;
+  cout<<"meanB = "<<value_B<<endl;
+  int height= a.cols;//列
+  int width=a.rows;//行
+  cout<<"width="<<width<<endl;
+  cout<<"heigth="<<height<<endl;
+  double s=0.0;
+  double q=0.0;
+  double p=0.0;
+  for(int i=0;i<width;i++){
+      for(int j=0;j<height;j++){
+
+         s+=(a.at<Vec3b>(i,j)[1]-value_A)*(b.at<Vec3b>(i,j)[0]-value_B);
+         p+=pow(a.at<Vec3b>(i,j)[1]-value_A,2);
+         q+=pow(b.at<Vec3b>(i,j)[1]-value_B,2);
+
+      }
+  }
+  cout<<"s="<<s<<endl;
+  cout<<"sqrt(q*p)="<<sqrt(q*p)<<endl;
+
+  double r=s/sqrt(q*p);
+  cout<<"women keyi renwei r="<<r<<endl;
+  return r;
+
+}
+
 QImage HR_cat_2::MatToQImage(const cv::Mat& mat)
 {
     // 8-bits unsigned, NO. OF CHANNELS = 1
@@ -114,9 +152,28 @@ int HR_cat_2::btn1_clicked(){
     namedWindow("frame",0);
    setMouseCallback( "frame",  mouseWrapper, 0 );//消息响应机制
 
+   //处理步骤应该在while循环中完成因为这是一个实时流的处理，而且应该是在提取到的roi矩阵部分操作
+   //因为roi是在if中提取的所以要把流程定位在if中，后续步骤只是用来显示；
+
+   //通道分离；channels用来存储三个颜色通道，mat用来承载需要的通道；
+   //接下来的处理针对imageBlueChannel就可以了；
+   std::vector<Mat> channels;
+  Mat  imageBlueChannel;
+
+  vector<double> dst;
+
+   //用来存储相邻两针图像矩阵
+   Mat cur,next;
+
+   //**很重要！！！！*
+   //这里原本是用index来做标示，超过200 开始傅立叶变换但是发现会闪退，可能是vector std库函数的原因
+   //用了vecto.size()做标示，可以
+
    while(!stop)
    {
        cap>>frame;
+       split(frame, channels);
+       imageBlueChannel=channels.at(1);//0 蓝；1 绿；2 红；
        if( selectObject && selection.width > 0 && selection.height > 0 )
        {
            ROI = frame(selection);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI，
@@ -124,9 +181,42 @@ int HR_cat_2::btn1_clicked(){
                                   //是将frame帧图像中的选中矩形区域块图像进行操作，而不是新创建
                                   //一个内存来进行操作
            //当然所截图的矩形区域ROI，可以使用imwrite函数来保存
+           //这里只是为了显示的比较直观
            bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
-       }
-      imshow("frame",frame);
+
+           //如果此时读进来的是第第一幅矩阵
+           if(corr2_array.size()==0){
+               cur= imageBlueChannel;
+               next= imageBlueChannel;
+//               corr2_array[index]=corr2(cur,next);
+               corr2_array.push_back(corr2(cur,next));
+               cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+           }else if(corr2_array.size()!=0 && corr2_array.size()<200){
+               //说明index不为零但是小于200；
+               cap>>frame;
+
+
+               ROI = frame(selection);
+               bitwise_not(ROI, ROI);
+
+
+               split(frame, channels);
+               imageBlueChannel=channels.at(1);//0 蓝；1 绿；2 红；
+               cur=next;
+               next=imageBlueChannel;
+//               corr2_array[index++]=corr2(cur,next);
+                corr2_array.push_back(corr2(cur,next));
+                cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+           }
+           else{
+               cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+               //说明index大于等于200，可以进行傅立叶变换了
+//           dft(corr2_array,dst,0,0);
+
+          }
+
+      }
+      imshow("frame", frame);
       image_origin=MatToQImage(frame);
       ui->label->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label->setPixmap(QPixmap::fromImage(image_origin));//将视频显示到label上
