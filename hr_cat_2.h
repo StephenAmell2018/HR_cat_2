@@ -23,6 +23,7 @@ class HR_cat_2 : public QMainWindow
 
 public:
     QImage  image,image_origin;
+    QTimer *timer;
 
     //corr2_array用来存储互相关函数运算后得到的0-1之间的数值，这里不用指明长度因为是动态数组；
     vector<double> corr2_array;
@@ -33,6 +34,8 @@ public:
     explicit HR_cat_2(QWidget *parent = 0);
     QImage MatToQImage(const cv::Mat& mat);
     double corr2(Mat a,Mat b);
+
+    void ShowVec(const vector<double>& valList);
     ~HR_cat_2();
 
 
