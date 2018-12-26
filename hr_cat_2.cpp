@@ -3,6 +3,7 @@
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
 
+
 using namespace std;
 using namespace cv;
 
@@ -63,8 +64,8 @@ double HR_cat_2::corr2(Mat a,Mat b){
   meanStdDev(a,mean_A,stddev_1);
   meanStdDev(b,mean_B,stddev_2);
 
-  float value_A = mean_A.at<double>(0, 0);
-  float value_B = mean_B.at<double>(0, 0);
+  float value_A =mean_A.at<double>(1);
+  float value_B = mean_B.at<double>(1);
 
   cout<<"meanA = "<<value_A<<endl;
   cout<<"meanB = "<<value_B<<endl;
@@ -173,78 +174,87 @@ int HR_cat_2::btn1_clicked(){
    //这里原本是用index来做标示，超过200 开始傅立叶变换但是发现会闪退，可能是vector std库函数的原因
    //用了vecto.size()做标示，可以
 
-
+   Mat tmp,last;
+   last = NULL;
+//   while(!stop)
+//   {
+//       cap.read(tmp);
+//       cur = tmp(selection);
+//       double cor;
+//       if(corr2_array.size()!=0)
+//       {
+//           cor = corr2(last,cur);
+//           corr2_array.push_back(cor);
+//       }
+//       else
+//       {
+//           corr2_array.push_back(1.0);
+//       }
+//       last = cur.clone();
+//       cout<<cor<<endl;
+//   }
    while(!stop)
    {
 
-
-           if(corr2_array.size()==0){
                bool flag1= cap.read(frame);
                cout<<"捕获当前帧:"<<flag1<<endl;
-         //       split(frame, channels);
-         //       imageBlueChannel=channels.at(1);//0 蓝；1 绿；2 红；
-         //       if( selectObject && selection.width > 0 && selection.height > 0 )
-         //        {
-                     ROI = frame(selection);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI，
-                                            //对于内存而言，frame和ROI是公用内存的，所以下面这句实际
-                                            //是将frame帧图像中的选中矩形区域块图像进行操作，而不是新创建
-                                            //一个内存来进行操作
-                     //当然所截图的矩形区域ROI，可以使用imwrite函数来保存
-                     //这里只是为了显示的比较直观
-             //           bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
-         //    }
-                    //如果此时读进来的是第第一幅矩阵
+               ROI = frame(selection);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI，
+               //对于内存而言，frame和ROI是公用内存的，所以下面这句实际
+               //是将frame帧图像中的选中矩形区域块图像进行操作，而不是新创建
+               //一个内存来进行操作
+               //当然所截图的矩形区域ROI，可以使用imwrite函数来保存
+               //这里只是为了显示的比较直观
+//               bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
+               Mat mean_A;
+               Mat stddev_1;
+               meanStdDev(ROI,mean_A,stddev_1);
+               float value_A =mean_A.at<double>(1);
+               if(value_A==0)
+               {
+                 cout<<"请截图确定待测区域！"<<endl;
+               }else if(value_A!=0 &&  corr2_array.size()==0){
+                   cur=next=ROI;
+                   corr2_array.push_back(1);
+                   cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<50){
+                   cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
+                   bool flag2= cap.read(frame);
+                   cout<<"捕获下一帧:"<<flag2<<endl;
+                   ROI_next = frame(selection);
+                   next=ROI_next;
+                   int index=corr2(cur,next);
 
-//               cur= imageBlueChannel;
-//               next= imageBlueChannel;
-               cur=ROI;
-               next=ROI;
-//               corr2_array[index]=corr2(cur,next);
-//               corr2_array.push_back(corr2(cur,next));
-               corr2_array.push_back(1);
-               cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
-           }else if(corr2_array.size()!=0 && corr2_array.size()<200){
-               //说明index不为零但是小于200；
+                   corr2_array.push_back(index);
+                   cout<<"相关系数个数为："<<corr2_array.size()<<endl;
 
-               cur=next;
-               bool flag2= cap.read(frame);
-               cout<<"捕获下一帧:"<<flag2<<endl;
+               } else{
+                   //这里的逻辑应该是把第一个元素去掉 加进来第200号元素，变换
+                   corr2_array.erase(corr2_array.begin());
+                   cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
+                   bool flag3= cap.read(frame);
+                   cout<<"捕获下一帧:"<<flag3<<endl;
+                   ROI_next = frame(selection);
+                   next=ROI_next;
+                   corr2_array.push_back(corr2(cur,next));
+                   //傅立叶变换
+                   cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+//                   dft(corr2_array,dst,0,0);
+//                   ShowVec(dst);
+               }
 
 
-               ROI_next = frame(selection);
-//               bitwise_not(ROI, ROI);
-//               split(frame, channels);
-//               imageBlueChannel=channels.at(1);//0 蓝；1 绿；2 红；
-               next=ROI_next;
-//               corr2_array[index++]=corr2(cur,next);
-               cout<<"cur="<<cur<<endl;
-               cout<<"next="<<cur<<endl;
-
-                corr2_array.push_back(corr2(cur,next));
-                cout<<"相关系数个数为："<<corr2_array.size()<<endl;
-           }
-           else{
-//               cout<<"相关系数个数为："<<corr2_array.size()<<endl;
-               //说明index大于等于200，可以进行傅立叶变换了
-               cout<<"采集数据部分已经完成了可以出结果了"<<endl;
-//            dft(corr2_array,dst,0,0);
-//            ShowVec(dst);
-
-          }
 
 
       imshow("frame", frame);
       image_origin=MatToQImage(frame);
       ui->label->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label->setPixmap(QPixmap::fromImage(image_origin));//将视频显示到label上
-      image=MatToQImage(ROI);
+      image=MatToQImage(cur);
       ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
 
-
-
-
-       if( waitKey(30) == 27 )//ESC键退出
+       if( waitKey(30) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+           //考虑用定时器重构，但是很多架构都要改变
            stop = true;
    }
    return 0;
