@@ -24,10 +24,34 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
     ui(new Ui::HR_cat_2)
 {
     ui->setupUi(this);
+
+    setupQuadraticDemo(ui->qcustomplot);
+
+
+
     connect(ui->btn1,SIGNAL(clicked()),this,SLOT(btn1_clicked()));//打开摄像头按钮
 }
 
+void HR_cat_2::setupQuadraticDemo(QCustomPlot *customPlot)
+{
 
+  // generate some data:
+  QVector<double> x(101), y(101); // initialize with entries 0..100
+  for (int i=0; i<101; ++i)
+  {
+    x[i] = i/50.0 - 1; // x goes from -1 to 1
+    y[i] = x[i]*x[i];  // let's plot a quadratic function
+  }
+  // create graph and assign data to it:
+  ui->qcustomplot->addGraph();
+  ui->qcustomplot->graph(0)->setData(x, y);
+  // give the axes some labels:
+  ui->qcustomplot->xAxis->setLabel("x");
+  ui->qcustomplot->yAxis->setLabel("y");
+  // set axes ranges, so we see all data:
+  ui->qcustomplot->xAxis->setRange(-1, 1);
+  ui->qcustomplot->yAxis->setRange(0, 1);
+}
 
 void HR_cat_2::onMouse( int event, int x, int y, int, void* )
 {
@@ -142,6 +166,40 @@ QImage HR_cat_2::MatToQImage(const cv::Mat& mat)
     }
 }
 
+
+
+void HR_cat_2::DFT(double src[],Complex  dst[],int size){
+//    clock_t start,end;
+//    start=clock();
+
+    for(int m=0;m<size;m++){
+        double real=0.0;
+        double imagin=0.0;
+        for(int n=0;n<size;n++){
+            double x=M_PI*2*m*n;
+            real+=src[n]*cos(x/size);
+            imagin+=src[n]*(-sin(x/size));
+
+        }
+        dst[m].imagin=imagin;
+        dst[m].real=real;
+        if(imagin>=0.0){
+//            printf("%lf+%lfj\n",real,imagin);
+
+        }
+        else
+        {
+//            printf("%lf%lfj\n",real,imagin,sqrt(pow(dst[m].imagin,2)+pow(dst[m].real,2)));
+
+        }
+     printf("%lf\n",sqrt(pow(real,2)+pow(imagin,2)));
+    }
+//    end=clock();
+//    printf("DFT use time :%lf for Datasize of:%d\n",(double)(end-start)/CLOCKS_PER_SEC,size);
+
+}
+
+
 int HR_cat_2::btn1_clicked(){
     bool stop = false;
     Mat ROI,ROI_next;
@@ -195,6 +253,8 @@ int HR_cat_2::btn1_clicked(){
 //   }
    while(!stop)
    {
+              clock_t start,end;
+              start=clock();
 
                bool flag1= cap.read(frame);
                cout<<"捕获当前帧:"<<flag1<<endl;
@@ -216,7 +276,7 @@ int HR_cat_2::btn1_clicked(){
                    cur=next=ROI;
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<50){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<128){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
                    cout<<"捕获下一帧:"<<flag2<<endl;
@@ -238,6 +298,11 @@ int HR_cat_2::btn1_clicked(){
                    corr2_array.push_back(corr2(cur,next));
                    //傅立叶变换
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+                   Complex dst[corr2_array.size()];
+                   if   (!corr2_array.empty())   {
+                   DFT(&corr2_array[0],dst,corr2_array.size());
+                    }
+
 //                   dft(corr2_array,dst,0,0);
 //                   ShowVec(dst);
                }
@@ -253,7 +318,9 @@ int HR_cat_2::btn1_clicked(){
       ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
 
-       if( waitKey(30) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+      end=clock();
+     std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
+       if( waitKey(20) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
            //考虑用定时器重构，但是很多架构都要改变
            stop = true;
    }

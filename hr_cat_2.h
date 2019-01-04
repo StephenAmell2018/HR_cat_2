@@ -9,6 +9,10 @@
 #include <opencv2/opencv.hpp>
 #include <QMainWindow>
 
+
+#include <QWidget>
+#include "qcustomplot.h"
+
 using namespace std;
 using namespace cv;
 
@@ -35,9 +39,18 @@ public:
     QImage MatToQImage(const cv::Mat& mat);
     double corr2(Mat a,Mat b);
 
+    struct Complex_{
+        double real;
+        double imagin;
+    };
+    typedef struct Complex_ Complex;
+    void DFT(double src[],Complex  dst[],int size);
+
     void ShowVec(const vector<double>& valList);
     ~HR_cat_2();
 
+    //画图尝试
+    void setupQuadraticDemo(QCustomPlot *customPlot);
 
 public slots:
     void onMouse(int EVENT, int x, int y, int flags, void* userdata);//注意要放到public中；
@@ -48,6 +61,10 @@ int btn1_clicked();
 private:
     Ui::HR_cat_2 *ui;
 
+
+
 };
 
 #endif // HR_CAT_2_H
+
+
