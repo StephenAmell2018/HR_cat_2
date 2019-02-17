@@ -56,6 +56,10 @@ public slots:
     void onMouse(int EVENT, int x, int y, int flags, void* userdata);//注意要放到public中；
 private slots:
 int btn1_clicked();
+int btn2_clicked();
+void offline_video_dealing();
+
+
 
 
 private:
