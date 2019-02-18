@@ -79,12 +79,17 @@ void HR_cat_2::onMouse( int event, int x, int y, int, void* )
 
 //用于心率核心提取的相关算法
 double HR_cat_2::corr2(Mat a,Mat b){
-    Mat mean_A,mean_B;
-    Mat stddev_1,stddev_2;
-    meanStdDev(a,mean_A,stddev_1);
-    meanStdDev(b,mean_B,stddev_2);
-    float value_A =mean_A.at<double>(1);
-    float value_B = mean_B.at<double>(1);
+//    Mat mean_A,mean_B;
+//    Mat stddev_1,stddev_2;
+//    meanStdDev(a,mean_A,stddev_1);
+//    meanStdDev(b,mean_B,stddev_2);
+//    float value_A =mean_A.at<double>(1);
+//    float value_B = mean_B.at<double>(1);
+      Scalar mean1 = cv::mean( a );
+      double value_A = mean1.val[1];
+      Scalar mean2 = cv::mean( b );
+      double value_B = mean2.val[1];
+
     cout<<"meanA = "<<value_A<<endl;
     cout<<"meanB = "<<value_B<<endl;
     int height= a.cols;//列
@@ -187,8 +192,12 @@ void HR_cat_2::DFT(double src[],Complex  dst[],int size){
 int HR_cat_2::btn2_clicked(){
 
     VideoCapture cap;
-    cap.open("/Users/yanyupeng/Desktop/speckleVideo/180506/greenSpeckleVideo/hrspecklevideo_0006.avi");
-
+    cap.open("/Users/yanyupeng/Desktop/speckleVideo/180106/greenSpeckleVideo/greenSpeckleVideo_0002.avi");
+    //获取帧率
+    double rate = cap.get(CV_CAP_PROP_FPS);//60.002
+    cout<<"帧率为:"<<rate<<endl;
+    int numFrames =  cap.get(CV_CAP_PROP_FRAME_COUNT);
+    cout<<"总帧数为"<<numFrames<<endl;
     bool stop = false;
     Mat ROI,ROI_next;
 
@@ -217,15 +226,15 @@ int HR_cat_2::btn2_clicked(){
 
    Mat tmp,last;
    last = NULL;
+   int frameNum=0;
+   bool flag1= cap.read(frame);
+   cout<<"捕获当前帧:"<<++frameNum<<endl;
 
    while(!stop)
    {
               clock_t start,end;
               start=clock();
-
-               bool flag1= cap.read(frame);
-               cout<<"捕获当前帧:"<<flag1<<endl;
-               ROI = frame(selection);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI，
+               ROI = frame(selection);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
                //对于内存而言，frame和ROI是公用内存的，所以下面这句实际
                //是将frame帧图像中的选中矩形区域块图像进行操作，而不是新创建
                //一个内存来进行操作
@@ -243,13 +252,13 @@ int HR_cat_2::btn2_clicked(){
                    cur=next=ROI;
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<128){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<600){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
-                   cout<<"捕获下一帧:"<<flag2<<endl;
+                   cout<<"捕获下一帧:"<<++frameNum<<endl;
                    ROI_next = frame(selection);
                    next=ROI_next;
-                   int index=corr2(cur,next);
+                   double index=corr2(cur,next);
                    corr2_array.push_back(index);
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
                } else{
@@ -257,7 +266,7 @@ int HR_cat_2::btn2_clicked(){
                    corr2_array.erase(corr2_array.begin());
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag3= cap.read(frame);
-                   cout<<"捕获下一帧:"<<flag3<<endl;
+                   cout<<"捕获下一帧:"<<flag3<<++frameNum<<endl;
                    ROI_next = frame(selection);
                    next=ROI_next;
                    corr2_array.push_back(corr2(cur,next));
@@ -279,15 +288,17 @@ int HR_cat_2::btn2_clicked(){
       ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
 
-      end=clock();
-      std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
-       if( waitKey(20) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+
+       if( waitKey(100) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
            //考虑用定时器重构，但是很多架构都要改变
            stop = true;
+          end=clock();
+          std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
    }
    return 0;
 }
 
+//所有的选择分支都可以用comboBox来做
 void HR_cat_2::offline_video_dealing(){
     if(ui->comboBox->currentIndex()==1){
       //单独调用结构清晰，功能独立完成，具体在btn2_clicked中完成
