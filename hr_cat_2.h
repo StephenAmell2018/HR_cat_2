@@ -12,6 +12,9 @@
 
 #include <QWidget>
 #include "qcustomplot.h"
+#include <QtCharts/QChartView>
+#include <QSplineSeries>
+
 
 using namespace std;
 using namespace cv;
@@ -28,6 +31,7 @@ class HR_cat_2 : public QMainWindow
 public:
     QImage  image,image_origin;
     QTimer *timer;
+
 
     //corr2_array用来存储互相关函数运算后得到的0-1之间的数值，这里不用指明长度因为是动态数组；
     vector<double> corr2_array;
@@ -51,6 +55,8 @@ public:
 
     //画图尝试
     void setupQuadraticDemo(QCustomPlot *customPlot);
+    void timerEvent(QTimerEvent *event);
+
 
 public slots:
     void onMouse(int EVENT, int x, int y, int flags, void* userdata);//注意要放到public中；

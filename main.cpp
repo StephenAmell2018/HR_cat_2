@@ -7,5 +7,6 @@ int main(int argc, char *argv[])
     HR_cat_2 w;
     w.show();
 
+
     return a.exec();
 }

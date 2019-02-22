@@ -2,14 +2,22 @@
 #include "ui_hr_cat_2.h"
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
+#include "QValueAxis"
+#include<QDateTime>
+#include<QTime>
+
 
 using namespace std;
 using namespace cv;
+using namespace QtCharts;
 
 Mat frame;//保存帧图像
 Point origin;//用于保存鼠标选择第一次单击时点的位置
 Rect selection;//用于保存鼠标选择的矩形框
 bool selectObject = false;//代表是否在选要跟踪的初始目标，true表示正在用鼠标选择
+ QLineSeries *series;
+ int timerId;
+ int timerId_time;
 
 void mouseWrapper( int event, int x, int y, int flags, void* param )
 {
@@ -23,35 +31,45 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    setupQuadraticDemo(ui->qcustomplot); //关联了动态
+
+   series = new QLineSeries;
+                           QChart *chart = new QChart();
+                           chart->legend()->hide();
+                           chart->addSeries(series);
+                           for(int i=0;i<400;++i){
+                              series->append(i,0);
+                           }
+
+                           chart->setTitle("corr2_t");
+
+                           ui->graphicsView->setChart(chart);
+//                           ui->graphicsView->setRenderHint(QPainter::Antialiasing);
+                           QValueAxis *axisX = new QValueAxis;
+                           axisX->setRange(0,400);
+                           axisX->setLabelFormat("%g");
+                           axisX->setTitleText("axisX");
+
+                           QValueAxis *axisY = new QValueAxis;
+                           axisY->setRange(0,1);
+                           axisY->setTitleText("axisY");
+
+                           chart->setAxisX(axisX,series);
+                           chart->setAxisY(axisY,series);
+                           chart->legend()->hide();
+                           chart->setTitle("demo");
+                           timerId = startTimer(10);
+                           timerId_time=startTimer(100);
 
     connect(ui->btn1,SIGNAL(clicked()),this,SLOT(btn1_clicked()));//打开摄像头按钮
     connect(ui->btn2,SIGNAL(clicked()),this,SLOT(btn2_clicked()));
     connect(ui->comboBox,SIGNAL(currentIndexChanged(QString)),this,SLOT(offline_video_dealing()));
+    connect( ui->exit, SIGNAL(clicked()),qApp, SLOT(closeAllWindows()) );
 }
 
 
 
 //画图函数、、可以将具体的处理逻辑写在这里，然后在按钮函数那里调用！！
-void HR_cat_2::setupQuadraticDemo(QCustomPlot *customPlot)
-{
-  // generate some data:
-  QVector<double> x(101), y(101); // initialize with entries 0..100
-  for (int i=0; i<101; ++i)
-  {
-    x[i] = i/50.0 - 1; // x goes from -1 to 1
-    y[i] = x[i]*x[i];  // let's plot a quadratic function
-  }
-  // create graph and assign data to it:
-  ui->qcustomplot->addGraph();
-  ui->qcustomplot->graph(0)->setData(x, y);
-  // give the axes some labels:
-  ui->qcustomplot->xAxis->setLabel("x");
-  ui->qcustomplot->yAxis->setLabel("y");
-  // set axes ranges, so we see all data:
-  ui->qcustomplot->xAxis->setRange(-1, 1);
-  ui->qcustomplot->yAxis->setRange(0, 1);
-}
+
 
 void HR_cat_2::onMouse( int event, int x, int y, int, void* )
 {
@@ -189,10 +207,13 @@ void HR_cat_2::DFT(double src[],Complex  dst[],int size){
 }
 
 
+
+
+
 int HR_cat_2::btn2_clicked(){
 
     VideoCapture cap;
-    cap.open("/Users/yanyupeng/Desktop/speckleVideo/180106/greenSpeckleVideo/greenSpeckleVideo_0002.avi");
+    cap.open("/Users/yanyupeng/Desktop/speckleVideo/180325/greenSpeckleVideo/greenSpeckleVideo_0008.avi");
     //获取帧率
     double rate = cap.get(CV_CAP_PROP_FPS);//60.002
     cout<<"帧率为:"<<rate<<endl;
@@ -230,6 +251,7 @@ int HR_cat_2::btn2_clicked(){
    bool flag1= cap.read(frame);
    cout<<"捕获当前帧:"<<++frameNum<<endl;
 
+
    while(!stop)
    {
               clock_t start,end;
@@ -252,7 +274,8 @@ int HR_cat_2::btn2_clicked(){
                    cur=next=ROI;
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<600){
+                   //corr2 画图 第一个值
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<400){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
                    cout<<"捕获下一帧:"<<++frameNum<<endl;
@@ -272,13 +295,16 @@ int HR_cat_2::btn2_clicked(){
                    corr2_array.push_back(corr2(cur,next));
                    //傅立叶变换
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+
                    Complex dst[corr2_array.size()];
+                   ShowVec(corr2_array);
                    if   (!corr2_array.empty())   {
                    DFT(&corr2_array[0],dst,corr2_array.size());
                     }
 //                   dft(corr2_array,dst,0,0);
 //                   ShowVec(dst);
                }
+
 
       imshow("video", frame);
       image_origin=MatToQImage(frame);
@@ -289,14 +315,35 @@ int HR_cat_2::btn2_clicked(){
       ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
 
 
-       if( waitKey(100) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+       if( waitKey(10) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
            //考虑用定时器重构，但是很多架构都要改变
+
            stop = true;
           end=clock();
-          std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
+          std::cout<<"本次for循环使用时间为:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
    }
+
+
    return 0;
 }
+
+void HR_cat_2::timerEvent(QTimerEvent *event) {
+     if(event->timerId()== timerId)
+     {//定时器到时间,//模拟数据填充
+        // 模拟不停的接收到新数据
+        QVector<QPointF> points;
+        for(int i=0;i<corr2_array.size();i++){
+            points.append(QPointF(i,1-corr2_array[i]));
+        }
+        series->replace(points);
+    }else if(event->timerId()== timerId_time){
+         ui->curTime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss ddd"));
+     }
+
+}
+
+
+
 
 //所有的选择分支都可以用comboBox来做
 void HR_cat_2::offline_video_dealing(){
@@ -418,6 +465,9 @@ int HR_cat_2::btn1_clicked(){
       ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
 
+
+
+
       end=clock();
       std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
        if( waitKey(20) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
@@ -430,9 +480,11 @@ int HR_cat_2::btn1_clicked(){
 void HR_cat_2:: ShowVec(const vector<double>& valList)
 {
     int count = valList.size();
-    for (int i = 0; i < count;i++)
+     ofstream f("/Users/yanyupeng/Desktop/data.txt");//打开out.txt文件。
+    for (int i = 0; i < 512;i++)
     {
-        cout << valList[i] << endl;
+         // cout << valList[i] << endl;
+            f << corr2_array[i] << endl; //写入每个元素，每个元素单独一行。
     }
 }
 
