@@ -5,7 +5,11 @@
 #include "QValueAxis"
 #include<QDateTime>
 #include<QTime>
-
+#include <gsl/gsl_sf_bessel.h>
+#include <complex>
+#include<fftw3.h>
+#define real 0
+#define imag 1
 
 using namespace std;
 using namespace cv;
@@ -15,9 +19,14 @@ Mat frame;//保存帧图像
 Point origin;//用于保存鼠标选择第一次单击时点的位置
 Rect selection;//用于保存鼠标选择的矩形框
 bool selectObject = false;//代表是否在选要跟踪的初始目标，true表示正在用鼠标选择
- QLineSeries *series;
+QSplineSeries* series;
+QSplineSeries* series_fft;
+
  int timerId;
  int timerId_time;
+ int timeId_fft;
+
+
 
 void mouseWrapper( int event, int x, int y, int flags, void* param )
 {
@@ -30,9 +39,8 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
     ui(new Ui::HR_cat_2)
 {
     ui->setupUi(this);
-
-
-   series = new QLineSeries;
+                           //corr2在线波形显示
+                           series = new QSplineSeries;
                            QChart *chart = new QChart();
                            chart->legend()->hide();
                            chart->addSeries(series);
@@ -43,7 +51,7 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            chart->setTitle("corr2_t");
 
                            ui->graphicsView->setChart(chart);
-//                           ui->graphicsView->setRenderHint(QPainter::Antialiasing);
+//                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
                            QValueAxis *axisX = new QValueAxis;
                            axisX->setRange(0,400);
                            axisX->setLabelFormat("%g");
@@ -59,6 +67,35 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            chart->setTitle("demo");
                            timerId = startTimer(10);
                            timerId_time=startTimer(100);
+                           timeId_fft=startTimer(50);
+
+                           //fft变换的实时波形显示
+                           series_fft = new QSplineSeries;
+                           QChart *chart_fft = new QChart();
+                           chart_fft->legend()->hide();
+                           chart_fft->addSeries(series_fft);
+                           for(int i=0;i<512;++i){
+                              series_fft->append(i,0);
+                           }
+
+                           chart_fft->setTitle("corr2_fft");
+
+                           ui->fft_display->setChart(chart_fft);
+//                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
+                           QValueAxis *axisX_fft = new QValueAxis;
+                           axisX_fft->setRange(0,50);
+                           axisX_fft->setTickCount(11);
+                           axisX_fft->setLabelFormat("%g");
+                           axisX_fft->setTitleText("axisX");
+
+                           QValueAxis *axisY_fft = new QValueAxis;
+                           axisY_fft->setRange(0,0.6);
+                           axisY_fft->setTitleText("axisY");
+
+                           chart_fft->setAxisX(axisX_fft,series_fft);
+                           chart_fft->setAxisY(axisY_fft,series_fft);
+                           chart_fft->legend()->hide();
+                           chart_fft->setTitle("fft_display");
 
     connect(ui->btn1,SIGNAL(clicked()),this,SLOT(btn1_clicked()));//打开摄像头按钮
     connect(ui->btn2,SIGNAL(clicked()),this,SLOT(btn2_clicked()));
@@ -92,6 +129,7 @@ void HR_cat_2::onMouse( int event, int x, int y, int, void* )
         selectObject = false;
         if( selection.width > 0 && selection.height > 0 )
         break;
+
     }
 }
 
@@ -179,32 +217,32 @@ QImage HR_cat_2::MatToQImage(const cv::Mat& mat)
     }
 }
 
-void HR_cat_2::DFT(double src[],Complex  dst[],int size){
-//    clock_t start,end;
-//    start=clock();
+//void HR_cat_2::DFT(vector<double>src,complex<double>  dst[],int size){
+////    clock_t start,end;
+////    start=clock();
 
-    for(int m=0;m<size;m++){
-        double real=0.0;
-        double imagin=0.0;
-        for(int n=0;n<size;n++){
-            double x=M_PI*2*m*n;
-            real+=src[n]*cos(x/size);
-            imagin+=src[n]*(-sin(x/size));
-        }
-        dst[m].imagin=imagin;
-        dst[m].real=real;
-        if(imagin>=0.0){
-//            printf("%lf+%lfj\n",real,imagin);
-        }
-        else
-        {
-//            printf("%lf%lfj\n",real,imagin,sqrt(pow(dst[m].imagin,2)+pow(dst[m].real,2)));
-        }
-     printf("%lf\n",sqrt(pow(real,2)+pow(imagin,2)));
-    }
-//    end=clock();
-//    printf("DFT use time :%lf for Datasize of:%d\n",(double)(end-start)/CLOCKS_PER_SEC,size);
-}
+//    for(int m=0;m<size;m++){
+//        double real=0.0;
+//        double imagin=0.0;
+//        for(int n=0;n<size;n++){
+//            double x=M_PI*2*m*n;
+//            real+=src[n]*cos(x/size);
+//            imagin+=src[n]*(-sin(x/size));
+//        }
+//        dst[m].imag()=imagin;
+//        dst[m].real()=real;
+//        if(imagin>=0.0){
+////            printf("%lf+%lfj\n",real,imagin);
+//        }
+//        else
+//        {
+////            printf("%lf%lfj\n",real,imagin,sqrt(pow(dst[m].imagin,2)+pow(dst[m].real,2)));
+//        }
+//     printf("%lf\n",sqrt(pow(real,2)+pow(imagin,2)));
+//    }
+////    end=clock();
+////    printf("DFT use Complex :%lf for Datasize of:%d\n",(double)(end-start)/CLOCKS_PER_SEC,size);
+//}
 
 
 
@@ -238,7 +276,7 @@ int HR_cat_2::btn2_clicked(){
    //接下来的处理针对imageBlueChannel就可以了；
    std::vector<Mat> channels;
    Mat  imageBlueChannel;
-   vector<double> dst;
+
    //用来存储相邻两针图像矩阵
    Mat cur,next;
    //**很重要！！！！*
@@ -248,7 +286,9 @@ int HR_cat_2::btn2_clicked(){
    Mat tmp,last;
    last = NULL;
    int frameNum=0;
+   Mat test;
    bool flag1= cap.read(frame);
+
    cout<<"捕获当前帧:"<<++frameNum<<endl;
 
 
@@ -275,7 +315,7 @@ int HR_cat_2::btn2_clicked(){
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
                    //corr2 画图 第一个值
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<400){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<512){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
                    cout<<"捕获下一帧:"<<++frameNum<<endl;
@@ -296,10 +336,11 @@ int HR_cat_2::btn2_clicked(){
                    //傅立叶变换
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
 
-                   Complex dst[corr2_array.size()];
+
+
                    ShowVec(corr2_array);
                    if   (!corr2_array.empty())   {
-                   DFT(&corr2_array[0],dst,corr2_array.size());
+//                   DFT(corr2_array,dst,corr2_array.size());
                     }
 //                   dft(corr2_array,dst,0,0);
 //                   ShowVec(dst);
@@ -327,18 +368,63 @@ int HR_cat_2::btn2_clicked(){
    return 0;
 }
 
+
 void HR_cat_2::timerEvent(QTimerEvent *event) {
      if(event->timerId()== timerId)
      {//定时器到时间,//模拟数据填充
         // 模拟不停的接收到新数据
         QVector<QPointF> points;
+        //先去除信号的直流成分再画图和处理
+
         for(int i=0;i<corr2_array.size();i++){
+
             points.append(QPointF(i,1-corr2_array[i]));
         }
         series->replace(points);
+
+
+
     }else if(event->timerId()== timerId_time){
          ui->curTime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss ddd"));
+     }else if(event->timerId()==timeId_fft){
+         //完成fft原始赋值，和一些条件
+         int size=corr2_array.size();
+         //添加了规模判断以后不再闪退，可能是刚开始的null使得傅立叶失败
+         if(corr2_array.size()>511){
+         fftw_complex x[size];
+         fftw_complex y[size];
+         vector<double> amplitude;
+         for(int i=0;i<size;i++){
+             x[i][real]=corr2_array[i];
+             x[i][imag]=0;
+         }
+         //完成fft的内存开辟和fft变换
+         fftw_plan plan= fftw_plan_dft_1d(size,x,y,FFTW_FORWARD,FFTW_ESTIMATE);
+          fftw_execute(plan);
+          fftw_destroy_plan(plan);
+          fftw_cleanup();
+          cout<<"FFT"<<endl;
+          //用来测试傅立叶变换是否成功
+          // for(int i=0;i<size;i++){
+         // cout<<y[i][real]<<"---"<<y[i][imag]<<"i"<<endl;
+          for(int i=0;i<size;i++){
+              amplitude.push_back(sqrt(y[i][real]*y[i][real]+y[i][imag]*y[i][imag])/size);
+          }
+          QVector<QPointF> points_fft;
+          //先去除信号的直流成分再画图和处理
+
+          for(int i=0;i<amplitude.size();i++){
+
+              points_fft.append(QPointF(i,amplitude[i]));
+          }
+          series_fft->replace(points_fft);
+          amplitude.clear();
+
+}
+
+
      }
+
 
 }
 
@@ -378,7 +464,7 @@ int HR_cat_2::btn1_clicked(){
    //接下来的处理针对imageBlueChannel就可以了；
    std::vector<Mat> channels;
    Mat  imageBlueChannel;
-   vector<double> dst;
+
    //用来存储相邻两针图像矩阵
    Mat cur,next;
    //**很重要！！！！*
@@ -404,6 +490,7 @@ int HR_cat_2::btn1_clicked(){
 //       last = cur.clone();
 //       cout<<cor<<endl;
 //   }
+
    while(!stop)
    {
               clock_t start,end;
@@ -429,7 +516,7 @@ int HR_cat_2::btn1_clicked(){
                    cur=next=ROI;
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<128){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<512){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
                    cout<<"捕获下一帧:"<<flag2<<endl;
@@ -449,13 +536,12 @@ int HR_cat_2::btn1_clicked(){
                    corr2_array.push_back(corr2(cur,next));
                    //傅立叶变换
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
-                   Complex dst[corr2_array.size()];
-                   if   (!corr2_array.empty())   {
-                   DFT(&corr2_array[0],dst,corr2_array.size());
-                    }
-//                   dft(corr2_array,dst,0,0);
-//                   ShowVec(dst);
-               }
+                   //接下来准备做傅立叶
+                   //减均值,先不做 容易导致corr2_array超载
+
+
+
+
 
       imshow("frame", frame);
       image_origin=MatToQImage(frame);
@@ -474,19 +560,23 @@ int HR_cat_2::btn1_clicked(){
            //考虑用定时器重构，但是很多架构都要改变
            stop = true;
    }
+
+
    return 0;
+}
 }
 
 void HR_cat_2:: ShowVec(const vector<double>& valList)
 {
     int count = valList.size();
      ofstream f("/Users/yanyupeng/Desktop/data.txt");//打开out.txt文件。
-    for (int i = 0; i < 512;i++)
+    for (int i = 0; i < count;i++)
     {
          // cout << valList[i] << endl;
             f << corr2_array[i] << endl; //写入每个元素，每个元素单独一行。
     }
 }
+
 
 HR_cat_2::~HR_cat_2()
 {

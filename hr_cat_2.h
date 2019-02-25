@@ -9,6 +9,7 @@
 #include <opencv2/opencv.hpp>
 #include <QMainWindow>
 
+#include <complex>
 
 #include <QWidget>
 #include "qcustomplot.h"
@@ -34,7 +35,7 @@ public:
 
 
     //corr2_array用来存储互相关函数运算后得到的0-1之间的数值，这里不用指明长度因为是动态数组；
-    vector<double> corr2_array;
+
 
     //index用来指明corr2_array的规模，初始值为0，到达200开始做傅立叶变换；
 //    int size;
@@ -43,12 +44,17 @@ public:
     QImage MatToQImage(const cv::Mat& mat);
     double corr2(Mat a,Mat b);
 
-    struct Complex_{
-        double real;
-        double imagin;
-    };
-    typedef struct Complex_ Complex;
-    void DFT(double src[],Complex  dst[],int size);
+//    struct Complex_{
+//        double real;
+//        double imagin;
+//    };
+//    typedef struct Complex_ Complex;
+
+    vector<double> corr2_array;
+
+
+
+
 
     void ShowVec(const vector<double>& valList);
     ~HR_cat_2();
@@ -56,8 +62,6 @@ public:
     //画图尝试
     void setupQuadraticDemo(QCustomPlot *customPlot);
     void timerEvent(QTimerEvent *event);
-
-
 public slots:
     void onMouse(int EVENT, int x, int y, int flags, void* userdata);//注意要放到public中；
 private slots:

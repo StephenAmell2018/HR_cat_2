@@ -14,6 +14,12 @@ QT_CONFIG -= no-pkg-config
 CONFIG  += link_pkgconfig
 PKGCONFIG += opencv
 
+#for gsl
+INCLUDEPATH += /usr/local/Cellar/gsl/2.5/include
+INCLUDEPATH += /usr/local/include
+LIBS+=/usr/local/Cellar/gsl/2.5/lib/libgsl.a
+LIBS+=/usr/local/Cellar/gsl/2.5/lib/libgslcblas.a
+LIBS+=/usr/local/lib/libfftw3.a
 TARGET = HR_cat_2
 TEMPLATE = app
 
