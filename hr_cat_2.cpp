@@ -89,7 +89,7 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            axisX_fft->setTitleText("axisX");
 
                            QValueAxis *axisY_fft = new QValueAxis;
-                           axisY_fft->setRange(0,0.6);
+                           axisY_fft->setRange(0,0.1);
                            axisY_fft->setTitleText("axisY");
 
                            chart_fft->setAxisX(axisX_fft,series_fft);
@@ -390,12 +390,18 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
          //完成fft原始赋值，和一些条件
          int size=corr2_array.size();
          //添加了规模判断以后不再闪退，可能是刚开始的null使得傅立叶失败
-         if(corr2_array.size()>511){
+         vector<double> ave_corr2;
+         double value=accumulate(corr2_array.begin(),corr2_array.end(),0.0)/size;
+        for(int i=0;i<corr2_array.size();i++){
+         ave_corr2.push_back(corr2_array[i]-value);
+        }
+
+         if(ave_corr2.size()>511){
          fftw_complex x[size];
          fftw_complex y[size];
          vector<double> amplitude;
          for(int i=0;i<size;i++){
-             x[i][real]=corr2_array[i];
+             x[i][real]=ave_corr2[i];
              x[i][imag]=0;
          }
          //完成fft的内存开辟和fft变换
@@ -419,6 +425,7 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
           }
           series_fft->replace(points_fft);
           amplitude.clear();
+          ave_corr2.clear();
 
 }
 
