@@ -10,7 +10,7 @@
 #include<fftw3.h>
 #define real 0
 #define imag 1
-
+#define PI 3.1415926
 using namespace std;
 using namespace cv;
 using namespace QtCharts;
@@ -89,7 +89,7 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            axisX_fft->setTitleText("axisX");
 
                            QValueAxis *axisY_fft = new QValueAxis;
-                           axisY_fft->setRange(0,0.1);
+                           axisY_fft->setRange(0,0.075);
                            axisY_fft->setTitleText("axisY");
 
                            chart_fft->setAxisX(axisX_fft,series_fft);
@@ -368,6 +368,18 @@ int HR_cat_2::btn2_clicked(){
    return 0;
 }
 
+vector<double> HR_cat_2::generateGaussianTemplate(vector<double> window, int center, double sigma){
+
+    for(int i=0;i<window.size();i++){
+       double m=window[i]*exp(-0.5*pow(i-center,2)/pow(sigma,2));
+       m/=sigma*sqrt(2*PI);
+       window[i]=m;
+    }
+
+return window;
+
+}
+
 
 void HR_cat_2::timerEvent(QTimerEvent *event) {
      if(event->timerId()== timerId)
@@ -416,15 +428,18 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
           for(int i=0;i<size;i++){
               amplitude.push_back(sqrt(y[i][real]*y[i][real]+y[i][imag]*y[i][imag])/size);
           }
+          vector<double> amplitude_1=generateGaussianTemplate(amplitude,13,0.5);
+
           QVector<QPointF> points_fft;
           //先去除信号的直流成分再画图和处理
 
           for(int i=0;i<amplitude.size();i++){
 
-              points_fft.append(QPointF(i,amplitude[i]));
+              points_fft.append(QPointF(i,amplitude_1[i]));
           }
           series_fft->replace(points_fft);
           amplitude.clear();
+          amplitude_1.clear();
           ave_corr2.clear();
 
 }

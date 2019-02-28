@@ -62,6 +62,7 @@ public:
     //画图尝试
     void setupQuadraticDemo(QCustomPlot *customPlot);
     void timerEvent(QTimerEvent *event);
+    vector<double> generateGaussianTemplate(vector<double> window, int center, double sigma);
 public slots:
     void onMouse(int EVENT, int x, int y, int flags, void* userdata);//注意要放到public中；
 private slots:
