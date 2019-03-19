@@ -44,16 +44,23 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            QChart *chart = new QChart();
                            chart->legend()->hide();
                            chart->addSeries(series);
-                           for(int i=0;i<400;++i){
+                           for(int i=0;i<512;++i){
                               series->append(i,0);
                            }
-
+                           // Customize chart background
+                           QLinearGradient backgroundGradient;
+                           backgroundGradient.setStart(QPointF(0, 0));
+                           backgroundGradient.setFinalStop(QPointF(0, 1));
+                           backgroundGradient.setColorAt(0.0, QRgb(0xd2d0d1));
+                           backgroundGradient.setColorAt(1.0, QRgb(0x4c4547));
+                           backgroundGradient.setCoordinateMode(QGradient::ObjectBoundingMode);
+                           chart->setBackgroundBrush(backgroundGradient);
                            chart->setTitle("corr2_t");
 
                            ui->graphicsView->setChart(chart);
 //                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
                            QValueAxis *axisX = new QValueAxis;
-                           axisX->setRange(0,400);
+                           axisX->setRange(0,512);
                            axisX->setLabelFormat("%g");
                            axisX->setTitleText("axisX");
 
@@ -61,13 +68,26 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            axisY->setRange(0,1);
                            axisY->setTitleText("axisY");
 
+
+                           // Customize axis label font
+                           QFont labelsFont("Times",16,false);
+                           labelsFont.setPixelSize(12);
+                           axisX->setLabelsFont(labelsFont);
+                           axisY->setLabelsFont(labelsFont);
+
+                           // Customize axis colors
+                           QPen axisPen(QRgb(0xd18952));
+                           axisPen.setWidth(2);
+                           axisX->setLinePen(axisPen);
+                           axisY->setLinePen(axisPen);
+
                            chart->setAxisX(axisX,series);
                            chart->setAxisY(axisY,series);
                            chart->legend()->hide();
-                           chart->setTitle("demo");
+                           chart->setTitle("Correlation Coefficient Waveform");
                            timerId = startTimer(10);
-                           timerId_time=startTimer(100);
-                           timeId_fft=startTimer(50);
+                           timerId_time=startTimer(20);
+                           timeId_fft=startTimer(20);
 
                            //fft变换的实时波形显示
                            series_fft = new QSplineSeries;
@@ -78,8 +98,8 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                               series_fft->append(i,0);
                            }
 
-                           chart_fft->setTitle("corr2_fft");
-
+                           chart_fft->setTitle("Frequency Spectrogram");
+                           chart_fft->setBackgroundBrush(backgroundGradient);
                            ui->fft_display->setChart(chart_fft);
 //                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
                            QValueAxis *axisX_fft = new QValueAxis;
@@ -89,13 +109,25 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            axisX_fft->setTitleText("axisX");
 
                            QValueAxis *axisY_fft = new QValueAxis;
-                           axisY_fft->setRange(0,0.075);
+                           axisY_fft->setRange(0,0.02);
                            axisY_fft->setTitleText("axisY");
+
+
+                           labelsFont.setPixelSize(12);
+                           axisX_fft->setLabelsFont(labelsFont);
+                           axisY_fft->setLabelsFont(labelsFont);
+
+                           // Customize axis colors
+
+                           axisPen.setWidth(2);
+                           axisX_fft->setLinePen(axisPen);
+                           axisY_fft->setLinePen(axisPen);
+
 
                            chart_fft->setAxisX(axisX_fft,series_fft);
                            chart_fft->setAxisY(axisY_fft,series_fft);
                            chart_fft->legend()->hide();
-                           chart_fft->setTitle("fft_display");
+//                           chart_fft->setTitle("fft_display");
 
     connect(ui->btn1,SIGNAL(clicked()),this,SLOT(btn1_clicked()));//打开摄像头按钮
     connect(ui->btn2,SIGNAL(clicked()),this,SLOT(btn2_clicked()));
@@ -428,8 +460,11 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
           for(int i=0;i<size;i++){
               amplitude.push_back(sqrt(y[i][real]*y[i][real]+y[i][imag]*y[i][imag])/size);
           }
-          vector<double> amplitude_1=generateGaussianTemplate(amplitude,13,0.5);
-
+          vector<double> amplitude_1=generateGaussianTemplate(amplitude,13,2);
+          vector<double>::iterator biggest = std::max_element(std::begin(amplitude_1), std::end(amplitude_1));
+          cout << "Max element is " << *biggest<< " at position " << std::distance(std::begin(amplitude_1), biggest) << std::endl;
+          double HR_rate= distance(std::begin(amplitude_1), biggest)*60*60/512;
+          ui->HR->setText(QString::number(HR_rate,'f', 1));
           QVector<QPointF> points_fft;
           //先去除信号的直流成分再画图和处理
 
@@ -526,7 +561,7 @@ int HR_cat_2::btn1_clicked(){
                //一个内存来进行操作
                //当然所截图的矩形区域ROI，可以使用imwrite函数来保存
                //这里只是为了显示的比较直观
-               //bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
+               bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
                Mat mean_A;
                Mat stddev_1;
                meanStdDev(ROI,mean_A,stddev_1);
@@ -560,7 +595,7 @@ int HR_cat_2::btn1_clicked(){
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
                    //接下来准备做傅立叶
                    //减均值,先不做 容易导致corr2_array超载
-
+}
 
 
 
@@ -586,7 +621,7 @@ int HR_cat_2::btn1_clicked(){
 
    return 0;
 }
-}
+
 
 void HR_cat_2:: ShowVec(const vector<double>& valList)
 {
