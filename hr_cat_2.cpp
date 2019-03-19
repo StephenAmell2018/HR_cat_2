@@ -20,7 +20,7 @@ Point origin;//用于保存鼠标选择第一次单击时点的位置
 Rect selection;//用于保存鼠标选择的矩形框
 bool selectObject = false;//代表是否在选要跟踪的初始目标，true表示正在用鼠标选择
 QSplineSeries* series;
-QSplineSeries* series_fft;
+QLineSeries* series_fft;
 
  int timerId;
  int timerId_time;
@@ -39,6 +39,7 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
     ui(new Ui::HR_cat_2)
 {
     ui->setupUi(this);
+
                            //corr2在线波形显示
                            series = new QSplineSeries;
                            QChart *chart = new QChart();
@@ -89,52 +90,81 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            timerId_time=startTimer(20);
                            timeId_fft=startTimer(20);
 
-                           //fft变换的实时波形显示
-                           series_fft = new QSplineSeries;
-                           QChart *chart_fft = new QChart();
-                           chart_fft->legend()->hide();
-                           chart_fft->addSeries(series_fft);
-                           for(int i=0;i<512;++i){
-                              series_fft->append(i,0);
-                           }
-
-                           chart_fft->setTitle("Frequency Spectrogram");
-                           chart_fft->setBackgroundBrush(backgroundGradient);
-                           ui->fft_display->setChart(chart_fft);
-//                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
-                           QValueAxis *axisX_fft = new QValueAxis;
-                           axisX_fft->setRange(0,50);
-                           axisX_fft->setTickCount(11);
-                           axisX_fft->setLabelFormat("%g");
-                           axisX_fft->setTitleText("axisX");
-
-                           QValueAxis *axisY_fft = new QValueAxis;
-                           axisY_fft->setRange(0,0.02);
-                           axisY_fft->setTitleText("axisY");
 
 
-                           labelsFont.setPixelSize(12);
-                           axisX_fft->setLabelsFont(labelsFont);
-                           axisY_fft->setLabelsFont(labelsFont);
-
-                           // Customize axis colors
-
-                           axisPen.setWidth(2);
-                           axisX_fft->setLinePen(axisPen);
-                           axisY_fft->setLinePen(axisPen);
 
 
-                           chart_fft->setAxisX(axisX_fft,series_fft);
-                           chart_fft->setAxisY(axisY_fft,series_fft);
-                           chart_fft->legend()->hide();
-//                           chart_fft->setTitle("fft_display");
 
     connect(ui->btn1,SIGNAL(clicked()),this,SLOT(btn1_clicked()));//打开摄像头按钮
     connect(ui->btn2,SIGNAL(clicked()),this,SLOT(btn2_clicked()));
-    connect(ui->comboBox,SIGNAL(currentIndexChanged(QString)),this,SLOT(offline_video_dealing()));
+    connect(ui->comboBox,SIGNAL(currentIndexChanged(QString)),this,SLOT(video_dealing_chosing()));
     connect( ui->exit, SIGNAL(clicked()),qApp, SLOT(closeAllWindows()) );
+//    connect(ui->comboBox,SIGNAL(currentIndexChanged(QString)),this,SLOT(UIupdate()));
+
 }
 
+void HR_cat_2::UIupdate(){
+    QLinearGradient backgroundGradient;
+    backgroundGradient.setStart(QPointF(0, 0));
+    backgroundGradient.setFinalStop(QPointF(0, 1));
+    backgroundGradient.setColorAt(0.0, QRgb(0xd2d0d1));
+    backgroundGradient.setColorAt(1.0, QRgb(0x4c4547));
+    backgroundGradient.setCoordinateMode(QGradient::ObjectBoundingMode);
+    // Customize axis label font
+    QFont labelsFont("Times",16,false);
+    labelsFont.setPixelSize(12);
+
+    // Customize axis colors
+    QPen axisPen(QRgb(0xd18952));
+    axisPen.setWidth(2);
+
+    series_fft = new QSplineSeries;
+    QChart *chart_fft = new QChart();
+    chart_fft->legend()->hide();
+    chart_fft->addSeries(series_fft);
+    for(int i=0;i<512;++i){
+       series_fft->append(i,0);
+    }
+
+    chart_fft->setTitle("Frequency Spectrogram");
+    chart_fft->setBackgroundBrush(backgroundGradient);
+    ui->fft_display->setChart(chart_fft);
+//                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
+    QValueAxis *axisX_fft = new QValueAxis;
+
+        axisX_fft->setRange(140,180);
+        axisX_fft->setTickCount(11);
+        axisX_fft->setLabelFormat("%g");
+        axisX_fft->setTitleText("axisX");
+
+        QValueAxis *axisY_fft = new QValueAxis;
+        axisY_fft->setRange(0,0.0005);
+        axisY_fft->setTitleText("axisY");
+
+
+        labelsFont.setPixelSize(12);
+        axisX_fft->setLabelsFont(labelsFont);
+        axisY_fft->setLabelsFont(labelsFont);
+
+        // Customize axis colors
+
+        axisPen.setWidth(2);
+        axisX_fft->setLinePen(axisPen);
+        axisY_fft->setLinePen(axisPen);
+
+
+        chart_fft->setAxisX(axisX_fft,series_fft);
+        chart_fft->setAxisY(axisY_fft,series_fft);
+        chart_fft->legend()->hide();
+//                           chart_fft->setTitle("fft_display");
+
+        axisX_fft->setRange(140,180);
+        axisX_fft->setTickCount(11);
+        update();
+
+
+
+}
 
 
 //画图函数、、可以将具体的处理逻辑写在这里，然后在按钮函数那里调用！！
@@ -440,7 +470,17 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
          ave_corr2.push_back(corr2_array[i]-value);
         }
 
+        //test
+
+
          if(ave_corr2.size()>511){
+             for(int i=512;i<7168;i++){
+                 ave_corr2.push_back(0);
+             }
+
+             if(ui->comboBox->currentIndex()==1){
+                 size=7168;
+             }
          fftw_complex x[size];
          fftw_complex y[size];
          vector<double> amplitude;
@@ -460,10 +500,13 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
           for(int i=0;i<size;i++){
               amplitude.push_back(sqrt(y[i][real]*y[i][real]+y[i][imag]*y[i][imag])/size);
           }
-          vector<double> amplitude_1=generateGaussianTemplate(amplitude,13,2);
+          vector<double> amplitude_1=generateGaussianTemplate(amplitude,160,5);
           vector<double>::iterator biggest = std::max_element(std::begin(amplitude_1), std::end(amplitude_1));
           cout << "Max element is " << *biggest<< " at position " << std::distance(std::begin(amplitude_1), biggest) << std::endl;
-          double HR_rate= distance(std::begin(amplitude_1), biggest)*60*60/512;
+          double HR_rate= distance(std::begin(amplitude_1), biggest)*60*60/7168.0;
+
+
+
           ui->HR->setText(QString::number(HR_rate,'f', 1));
           QVector<QPointF> points_fft;
           //先去除信号的直流成分再画图和处理
@@ -477,6 +520,7 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
           amplitude_1.clear();
           ave_corr2.clear();
 
+
 }
 
 
@@ -489,10 +533,14 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
 
 
 //所有的选择分支都可以用comboBox来做
-void HR_cat_2::offline_video_dealing(){
+void HR_cat_2::video_dealing_chosing(){
     if(ui->comboBox->currentIndex()==1){
       //单独调用结构清晰，功能独立完成，具体在btn2_clicked中完成
+       UIupdate();
        btn2_clicked();
+
+
+
 
     }else if(ui->comboBox->currentIndex()==2){
         //单独调用结构清晰，功能独立完成，具体在btn1_clicked中完成

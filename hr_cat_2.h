@@ -8,7 +8,7 @@
 #include <QDebug>
 #include <opencv2/opencv.hpp>
 #include <QMainWindow>
-
+#include "QValueAxis"
 #include <complex>
 
 #include <QWidget>
@@ -32,6 +32,8 @@ class HR_cat_2 : public QMainWindow
 public:
     QImage  image,image_origin;
     QTimer *timer;
+
+
 
 
     //corr2_array用来存储互相关函数运算后得到的0-1之间的数值，这里不用指明长度因为是动态数组；
@@ -68,7 +70,8 @@ public slots:
 private slots:
 int btn1_clicked();
 int btn2_clicked();
-void offline_video_dealing();
+void video_dealing_chosing();
+void UIupdate();
 
 
 
