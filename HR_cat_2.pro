@@ -13,13 +13,19 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 QT_CONFIG -= no-pkg-config
 CONFIG  += link_pkgconfig
 PKGCONFIG += opencv
-
+PKGCONFIG+= x11
 #for gsl
 INCLUDEPATH += /usr/local/Cellar/gsl/2.5/include
 INCLUDEPATH += /usr/local/include
+INCLUDEPATH +=/opt/X11/include
+INCLUDEPATH +=/Users/yanyupeng/Documents/xmu/dlib
 LIBS+=/usr/local/Cellar/gsl/2.5/lib/libgsl.a
 LIBS+=/usr/local/Cellar/gsl/2.5/lib/libgslcblas.a
 LIBS+=/usr/local/lib/libfftw3.a
+LIBS+=/Users/yanyupeng/Documents/xmu/dlib/examples/build/dlib_build/libdlib.a
+LIBS+= -L/opt/X11/lib
+LIBS+= -L/Users/yanyupeng/Documents/xmu/dlib/dlib
+
 TARGET = HR_cat_2
 TEMPLATE = app
 

@@ -15,7 +15,9 @@ using namespace std;
 using namespace cv;
 using namespace QtCharts;
 
+
 Mat frame;//保存帧图像
+Mat frame_face;//人脸图像
 Point origin;//用于保存鼠标选择第一次单击时点的位置
 Rect selection;//用于保存鼠标选择的矩形框
 bool selectObject = false;//代表是否在选要跟踪的初始目标，true表示正在用鼠标选择
@@ -99,9 +101,278 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
     connect(ui->btn2,SIGNAL(clicked()),this,SLOT(btn2_clicked()));
     connect(ui->comboBox,SIGNAL(currentIndexChanged(QString)),this,SLOT(video_dealing_chosing()));
     connect( ui->exit, SIGNAL(clicked()),qApp, SLOT(closeAllWindows()) );
+    connect(ui->face,SIGNAL(clicked()),this,SLOT(btn3_clicked()));
+//    connect(timer_face, SIGNAL(timeout()),this, SLOT(readFrame()));
+//    connect(ui->face,SIGNAL(clicked()),this,SLOT(readFrame()));//打开摄像头按钮
+
+
 //    connect(ui->comboBox,SIGNAL(currentIndexChanged(QString)),this,SLOT(UIupdate()));
 
 }
+
+
+
+
+void HR_cat_2::drawPolyline
+(
+  Mat &im,
+  const vector<Point2f> &landmarks,
+  const int start,
+  const int end,
+  bool isClosed
+)
+{
+    // Gather all points between the start and end indices
+    vector <Point> points;
+    for (int i = start; i <= end; i++)
+    {
+        points.push_back(cv::Point(landmarks[i].x, landmarks[i].y));
+    }
+    // Draw polylines.
+    polylines(im, points, isClosed, cv::detail::DpSeamFinder::COLOR, 4, 16);
+
+}
+
+
+void HR_cat_2::drawLandmarks(Mat &im, vector<Point2f> &landmarks)
+{
+    // Draw face for the 68-point model.
+    if (landmarks.size() == 68)
+    {
+      drawPolyline(im, landmarks, 0, 16);           // Jaw line
+      drawPolyline(im, landmarks, 17, 21);          // Left eyebrow
+      drawPolyline(im, landmarks, 22, 26);          // Right eyebrow
+      drawPolyline(im, landmarks, 27, 30);          // Nose bridge
+      drawPolyline(im, landmarks, 30, 35, true);    // Lower nose
+      drawPolyline(im, landmarks, 36, 41, true);    // Left eye
+      drawPolyline(im, landmarks, 42, 47, true);    // Right Eye
+      drawPolyline(im, landmarks, 48, 59, true);    // Outer lip
+      drawPolyline(im, landmarks, 60, 67, true);    // Inner lip
+    }
+    else
+    { // If the number of points is not 68, we do not know which
+      // points correspond to which facial features. So, we draw
+      // one dot per landamrk.
+//      for(int i = 0; i < landmarks.size(); i++)
+//      {
+//        rectangle(im,landmarks[i],3, cv::detail::DpSeamFinder::COLOR, FILLED);
+//      }
+     rectangle(im, landmarks[17],landmarks[59], Scalar(0,0,255), -1);    }
+
+}
+
+
+int k=0;
+
+void HR_cat_2::btn3_clicked()
+{
+    if( !face_cascade.load("/usr/local/Cellar/opencv/3.4.1_5/share/OpenCV/haarcascades/haarcascade_frontalface_alt2.xml") )
+           cout << "--(!)Error loading face cascade\n";
+    facemark = face::FacemarkLBF::create();
+
+        // Load landmark detector
+        facemark->loadModel("/Users/yanyupeng/GSOC2017/data/lbfmodel.yaml");
+
+    cap.open(0);
+    bool stop = false;
+    Mat ROI,ROI_next;
+
+   std::vector<Mat> channels;
+   Mat  imageBlueChannel;
+
+   //用来存储相邻两针图像矩阵
+   Mat cur,next;
+   //**很重要！！！！*
+   //这里原本是用index来做标示，超过200 开始傅立叶变换但是发现会闪退，可能是vector std库函数的原因
+   //用了vecto.size()做标示，可以
+
+   Mat tmp,last;
+   last = NULL;
+   int frameNum=0;
+   Mat test;
+   cap >> frame_face;
+   k++;
+
+   cout<<"捕获当前帧:"<<++frameNum<<endl;
+
+   Mat gray, frame1, frame2;
+   vector<Rect> faces;
+   cvtColor(frame_face, gray, COLOR_BGR2GRAY);
+   cvtColor(frame_face, frame1, COLOR_BGR2RGB);
+
+   equalizeHist(gray, gray);
+   //-- Detect faces
+   face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+   for ( size_t i = 0; i < faces.size(); i++ )
+   {
+       Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
+//       ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+       rectangle(frame_face, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height),
+         Scalar( 0, 0, 255 ), 4, 8);
+   }
+   vector< vector<Point2f> > landmarks;
+       // Run landmark detector
+       bool success = facemark->fit(frame_face,faces,landmarks);
+       if(success)
+       {
+         // If successful, render the landmarks on the face
+         for(int i = 0; i < landmarks.size(); i++)
+         {
+           drawLandmarks(frame_face, landmarks[i]);
+
+         }
+       }
+
+    selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
+   while(!stop)
+   {
+              clock_t start,end;
+              start=clock();
+
+               ROI=frame_face(selection);
+               namedWindow("frame_face",0);
+               imshow("frame_face",frame_face);
+               waitKey(3);
+
+               Mat mean_A;
+               Mat stddev_1;
+               meanStdDev(ROI,mean_A,stddev_1);
+               float value_A =mean_A.at<double>(1);
+              if(value_A!=0 &&  corr2_array.size()==0){
+                   cur=next=ROI;
+                   corr2_array.push_back(1);
+                   cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
+                   //corr2 画图 第一个值
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<512){
+                   cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
+//                   bool flag2= cap.read(frame_face);
+                   cap >> frame_face;
+                   cout<<"捕获下一帧:"<<++frameNum<<endl;
+                   cvtColor(frame_face, gray, COLOR_BGR2GRAY);
+                   cvtColor(frame_face, frame1, COLOR_BGR2RGB);
+
+                   equalizeHist(gray, gray);
+                   //-- Detect faces
+                   face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+                   for ( size_t i = 0; i < faces.size(); i++ )
+                   {
+                       Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
+               //       ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+                       rectangle(frame_face, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height),
+                         Scalar( 0, 0, 255 ), 4, 8);
+                   }
+                   vector< vector<Point2f> > landmarks;
+                       // Run landmark detector
+                       bool success = facemark->fit(frame_face,faces,landmarks);
+
+                       if(success)
+                       {
+                         // If successful, render the landmarks on the face
+                         for(int i = 0; i < landmarks.size(); i++)
+                         {
+                           drawLandmarks(frame_face, landmarks[i]);
+
+                         }
+                       }
+             selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
+
+
+                   ROI_next = frame_face(selection);
+                   next=ROI_next;
+                   double index=corr2(cur,next);
+                   corr2_array.push_back(index);
+                   cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+                   k++;
+               } else{
+                   //这里的逻辑应该是把第一个元素去掉 加进来第200号元素，变换
+                   corr2_array.erase(corr2_array.begin());
+                   cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
+//                   bool flag3= cap.read(frame_face);
+//                   cout<<"捕获下一帧:"<<flag3<<++frameNum<<endl;
+                   cap >> frame_face;
+                   cvtColor(frame_face, gray, COLOR_BGR2GRAY);
+                   cvtColor(frame_face, frame1, COLOR_BGR2RGB);
+
+                   equalizeHist(gray, gray);
+                   //-- Detect faces
+                   face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+                   for ( size_t i = 0; i < faces.size(); i++ )
+                   {
+                       Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
+               //       ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+                       rectangle(frame_face, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height),
+                         Scalar( 0, 0, 255 ), 4, 8);
+                   }
+                   vector< vector<Point2f> > landmarks;
+                       // Run landmark detector
+                       bool success = facemark->fit(frame_face,faces,landmarks);
+
+                       if(success)
+                       {
+                         // If successful, render the landmarks on the face
+                         for(int i = 0; i < landmarks.size(); i++)
+                         {
+                           drawLandmarks(frame_face, landmarks[i]);
+
+                         }
+                       }
+                   selection = Rect(100,100,100,100);//这句话是将frame帧图片中的选中矩形区域的地址指向
+                   ROI_next=frame_face(selection);
+                   next=ROI_next;
+
+                   k++;
+                   corr2_array.push_back(corr2(cur,next));
+                   //傅立叶变换
+                   cout<<"相关系数个数为："<<corr2_array.size()<<endl;
+
+                   ShowVec(corr2_array);
+
+}
+//              cvtColor(frame_face, frame2, COLOR_BGR2RGB);
+//              QImage img1((const uchar*)frame2.data,
+//                         frame2.cols, frame2.rows,
+//                         frame2.cols * frame2.channels(),
+//                         QImage::Format_RGB888);
+//              ui->label2->setPixmap(QPixmap::fromImage(img1));
+//               ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+//               string Img_Name = "/Users/yanyupeng/Desktop/pic/" +to_string(k)+".bmp";
+//               imwrite(Img_Name,frame_face);
+//               k++;
+               cvtColor(frame_face, frame2, COLOR_BGR2RGB);
+               namedWindow("frame_face",0);
+               imshow("frame_face",frame_face);
+               waitKey(3);
+               QImage imagexxx((const uchar*)frame2.data,
+                         frame2.cols, frame2.rows,
+                         frame2.cols * frame2.channels(),
+                         QImage::Format_RGB888);
+               ui->label->setPixmap(QPixmap::fromImage(imagexxx));
+               ui->label->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+
+               QImage imageyyy((const uchar*)cur.data,
+                         cur.cols, cur.rows,
+                         cur.cols * cur.channels(),
+                         QImage::Format_RGB888);
+               ui->label2->setPixmap(QPixmap::fromImage(imageyyy));
+               ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+       if( waitKey(10) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+           //考虑用定时器重构，但是很多架构都要改变
+
+           stop = true;
+          end=clock();
+          std::cout<<"本次for循环使用时间为:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
+   }
+
+
+
+
+
+//    cap >> frame_face;
+
+
+}
+
+
 
 void HR_cat_2::UIupdate(){
     QLinearGradient backgroundGradient;

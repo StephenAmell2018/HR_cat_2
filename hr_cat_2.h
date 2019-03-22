@@ -8,14 +8,20 @@
 #include <QDebug>
 #include <opencv2/opencv.hpp>
 #include <QMainWindow>
+#include <vector>
 #include "QValueAxis"
 #include <complex>
-
+#include <opencv2/face.hpp>
 #include <QWidget>
 #include "qcustomplot.h"
 #include <QtCharts/QChartView>
 #include <QSplineSeries>
-
+#include <dlib/image_processing/frontal_face_detector.h>
+#include <dlib/image_processing/render_face_detections.h>
+#include <dlib/image_processing.h>
+#include <dlib/gui_widgets.h>
+#include <dlib/image_io.h>
+#include <iostream>
 
 using namespace std;
 using namespace cv;
@@ -72,12 +78,28 @@ int btn1_clicked();
 int btn2_clicked();
 void video_dealing_chosing();
 void UIupdate();
+void btn3_clicked();
+void drawPolyline
+    (
+      Mat &im,
+      const vector<Point2f> &landmarks,
+      const int start,
+      const int end,
+      bool isClosed = false
+    );
+
+void drawLandmarks(Mat &im, vector<Point2f> &landmarks);
 
 
 
 
 private:
     Ui::HR_cat_2 *ui;
+    Ptr<face::Facemark> facemark;
+    QTimer    *timer_face;
+
+    VideoCapture cap;
+    CascadeClassifier face_cascade;
 
 
 
