@@ -23,6 +23,8 @@ Rect selection;//用于保存鼠标选择的矩形框
 bool selectObject = false;//代表是否在选要跟踪的初始目标，true表示正在用鼠标选择
 QSplineSeries* series;
 QLineSeries* series_fft;
+QLineSeries* max_paint;
+QChart *chart_fft;
 
  int timerId;
  int timerId_time;
@@ -47,9 +49,7 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            QChart *chart = new QChart();
                            chart->legend()->hide();
                            chart->addSeries(series);
-                           for(int i=0;i<512;++i){
-                              series->append(i,0);
-                           }
+
                            // Customize chart background
                            QLinearGradient backgroundGradient;
                            backgroundGradient.setStart(QPointF(0, 0));
@@ -65,15 +65,15 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            QValueAxis *axisX = new QValueAxis;
                            axisX->setRange(0,512);
                            axisX->setLabelFormat("%g");
-                           axisX->setTitleText("axisX");
+                           axisX->setTitleText("Image_Frames");
 
                            QValueAxis *axisY = new QValueAxis;
                            axisY->setRange(0,1);
-                           axisY->setTitleText("axisY");
+                           axisY->setTitleText("Correlation_Coefficent");
 
 
                            // Customize axis label font
-                           QFont labelsFont("Times",16,false);
+                           QFont labelsFont("Times",20,false);
                            labelsFont.setPixelSize(12);
                            axisX->setLabelsFont(labelsFont);
                            axisY->setLabelsFont(labelsFont);
@@ -220,9 +220,10 @@ void HR_cat_2::btn3_clicked()
          {
            drawLandmarks(frame_face, landmarks[i]);
 
+
          }
        }
-
+   //这个选择很重要
     selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
    while(!stop)
    {
@@ -383,19 +384,27 @@ void HR_cat_2::UIupdate(){
     backgroundGradient.setCoordinateMode(QGradient::ObjectBoundingMode);
     // Customize axis label font
     QFont labelsFont("Times",16,false);
-    labelsFont.setPixelSize(12);
+    labelsFont.setPixelSize(14);
 
     // Customize axis colors
     QPen axisPen(QRgb(0xd18952));
     axisPen.setWidth(2);
 
     series_fft = new QSplineSeries;
-    QChart *chart_fft = new QChart();
+    max_paint = new QLineSeries;
+
+
+
+    chart_fft = new QChart();
     chart_fft->legend()->hide();
     chart_fft->addSeries(series_fft);
-    for(int i=0;i<512;++i){
-       series_fft->append(i,0);
-    }
+    chart_fft->addSeries(max_paint);
+
+
+
+
+
+
 
     chart_fft->setTitle("Frequency Spectrogram");
     chart_fft->setBackgroundBrush(backgroundGradient);
@@ -406,11 +415,11 @@ void HR_cat_2::UIupdate(){
         axisX_fft->setRange(140,180);
         axisX_fft->setTickCount(11);
         axisX_fft->setLabelFormat("%g");
-        axisX_fft->setTitleText("axisX");
+        axisX_fft->setTitleText("Frequency");
 
         QValueAxis *axisY_fft = new QValueAxis;
-        axisY_fft->setRange(0,0.0005);
-        axisY_fft->setTitleText("axisY");
+        axisY_fft->setRange(0,0.00015);
+        axisY_fft->setTitleText("Spectral_Power");
 
 
         labelsFont.setPixelSize(12);
@@ -426,10 +435,12 @@ void HR_cat_2::UIupdate(){
 
         chart_fft->setAxisX(axisX_fft,series_fft);
         chart_fft->setAxisY(axisY_fft,series_fft);
+        chart_fft->setAxisX(axisX_fft,max_paint);
+        chart_fft->setAxisY(axisY_fft,max_paint);
         chart_fft->legend()->hide();
 //                           chart_fft->setTitle("fft_display");
 
-        axisX_fft->setRange(140,180);
+        axisX_fft->setRange(100,300);
         axisX_fft->setTickCount(11);
         update();
 
@@ -602,6 +613,7 @@ int HR_cat_2::btn2_clicked(){
     namedWindow("video",0);
     setMouseCallback( "video",  mouseWrapper, 0 );//消息响应机制
 
+
    //处理步骤应该在while循环中完成因为这是一个实时流的处理，而且应该是在提取到的roi矩阵部分操作
    //因为roi是在if中提取的所以要把流程定位在if中，后续步骤只是用来显示；
 
@@ -664,6 +676,7 @@ int HR_cat_2::btn2_clicked(){
                    bool flag3= cap.read(frame);
                    cout<<"捕获下一帧:"<<flag3<<++frameNum<<endl;
                    ROI_next = frame(selection);
+
                    next=ROI_next;
                    corr2_array.push_back(corr2(cur,next));
                    //傅立叶变换
@@ -678,6 +691,10 @@ int HR_cat_2::btn2_clicked(){
 //                   dft(corr2_array,dst,0,0);
 //                   ShowVec(dst);
                }
+
+       rectangle(frame,selection,Scalar(255, 0, 0),2,8,0);
+       //出现两条蓝色叠线的原因是因为frame已经画过线了
+       rectangle(cur,selection,Scalar(255, 0,0),2,8,0);
 
 
       imshow("video", frame);
@@ -772,21 +789,46 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
               amplitude.push_back(sqrt(y[i][real]*y[i][real]+y[i][imag]*y[i][imag])/size);
           }
           vector<double> amplitude_1=generateGaussianTemplate(amplitude,160,5);
+          //实验1 修改amplitude_1为amplitude1 可以显示宽通带滤波的效果
           vector<double>::iterator biggest = std::max_element(std::begin(amplitude_1), std::end(amplitude_1));
-          cout << "Max element is " << *biggest<< " at position " << std::distance(std::begin(amplitude_1), biggest) << std::endl;
+          //最大值的位置
+          int max_position=std::distance(std::begin(amplitude_1), biggest);
+          ui->label_4->setText("Heart Rate Frequency is    "+QString::number((float)max_position*60/7168,'f', 3)+"Hz");
+          cout<<"最大值是"<<max_position<<endl;
+          cout << "Max element is " << *biggest<< " at position " << max_position << std::endl;
           double HR_rate= distance(std::begin(amplitude_1), biggest)*60*60/7168.0;
 
-
+//          max->append((int)*biggest,(int)amplitude_1[*biggest]);
 
           ui->HR->setText(QString::number(HR_rate,'f', 1));
           QVector<QPointF> points_fft;
+           QVector<QPointF> max_fft;
           //先去除信号的直流成分再画图和处理
 
           for(int i=0;i<amplitude.size();i++){
 
               points_fft.append(QPointF(i,amplitude_1[i]));
+
+              //完成最大值处的标记
+              max_fft.append(QPointF(max_position,amplitude_1[max_position]));
+              max_fft.append(QPointF(max_position,0));
+
+
+
           }
+//          for(int i=0;i<amplitude.size()/2;i++){
+
+//              max_fft.append(QPointF((int)*biggest,amplitude_1[(int)*biggest]));
+//              max_fft.append(QPointF(0,amplitude_1[(int)*biggest]));
+
+//          }
+
+
+
+
+//           cout<<*biggest<<amplitude_1[*biggest]<<endl;
           series_fft->replace(points_fft);
+          max_paint->replace(max_fft);
           amplitude.clear();
           amplitude_1.clear();
           ave_corr2.clear();
@@ -805,6 +847,7 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
 
 //所有的选择分支都可以用comboBox来做
 void HR_cat_2::video_dealing_chosing(){
+
     if(ui->comboBox->currentIndex()==1){
       //单独调用结构清晰，功能独立完成，具体在btn2_clicked中完成
        UIupdate();
@@ -932,7 +975,7 @@ int HR_cat_2::btn1_clicked(){
 
       end=clock();
       std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
-       if( waitKey(20) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+       if( waitKey(5) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
            //考虑用定时器重构，但是很多架构都要改变
            stop = true;
    }
