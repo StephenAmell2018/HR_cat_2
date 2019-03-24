@@ -203,12 +203,18 @@ void HR_cat_2::btn3_clicked()
    equalizeHist(gray, gray);
    //-- Detect faces
    face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-   for ( size_t i = 0; i < faces.size(); i++ )
+    vector<Rect>::iterator i;
+   for (  i = faces.begin(); i!=faces.end();)
    {
-       Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
-//       ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
-       rectangle(frame_face, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height),
+//       ellipse( frame, center, Size( (*i).width/2, (*i).height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+       rectangle(frame_face, Point((*i).x, (*i).y), Point((*i).x + (*i).width, (*i).y + (*i).height),
          Scalar( 0, 0, 255 ), 4, 8);
+       //检测到多个人脸，且如果尺寸过小
+       if(faces.size()>1 &&((*i).width<100 ||(*i).height<100)){
+           i=faces.erase(i);
+       }else {
+           i++;
+       }
    }
    vector< vector<Point2f> > landmarks;
        // Run landmark detector
@@ -224,13 +230,21 @@ void HR_cat_2::btn3_clicked()
          }
        }
    //这个选择很重要
-    selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
+//    selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
+       //通过人脸特征点划定某个区域为ROI
+       //进行伪人脸去除
+
+
+     Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+      //face向量队列中存储着检测到的人脸，一般为1，可以设定重复标定值，有时候是2可取第一个。
+
+
    while(!stop)
    {
               clock_t start,end;
               start=clock();
 
-               ROI=frame_face(selection);
+               ROI=frame_face(face);
                namedWindow("frame_face",0);
                imshow("frame_face",frame_face);
                waitKey(3);
@@ -255,13 +269,19 @@ void HR_cat_2::btn3_clicked()
                    equalizeHist(gray, gray);
                    //-- Detect faces
                    face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-                   for ( size_t i = 0; i < faces.size(); i++ )
-                   {
-                       Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
-               //       ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
-                       rectangle(frame_face, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height),
-                         Scalar( 0, 0, 255 ), 4, 8);
-                   }
+                   vector<Rect>::iterator i;
+                  for (  i = faces.begin(); i!=faces.end();)
+                  {
+               //       ellipse( frame, center, Size( (*i).width/2, (*i).height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+                      rectangle(frame_face, Point((*i).x, (*i).y), Point((*i).x + (*i).width, (*i).y + (*i).height),
+                        Scalar( 0, 0, 255 ), 4, 8);
+                      //检测到多个人脸，且如果尺寸过小
+                      if(faces.size()>1 &&((*i).width<100 ||(*i).height<100)){
+                          i=faces.erase(i);
+                      }else {
+                          i++;
+                      }
+                  }
                    vector< vector<Point2f> > landmarks;
                        // Run landmark detector
                        bool success = facemark->fit(frame_face,faces,landmarks);
@@ -275,10 +295,10 @@ void HR_cat_2::btn3_clicked()
 
                          }
                        }
-             selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
+  //替代selection
+   Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
 
-
-                   ROI_next = frame_face(selection);
+                   ROI_next = frame_face(face);
                    next=ROI_next;
                    double index=corr2(cur,next);
                    corr2_array.push_back(index);
@@ -297,13 +317,19 @@ void HR_cat_2::btn3_clicked()
                    equalizeHist(gray, gray);
                    //-- Detect faces
                    face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
-                   for ( size_t i = 0; i < faces.size(); i++ )
-                   {
-                       Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
-               //       ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
-                       rectangle(frame_face, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height),
-                         Scalar( 0, 0, 255 ), 4, 8);
-                   }
+                   vector<Rect>::iterator i;
+                  for (  i = faces.begin(); i!=faces.end();)
+                  {
+               //       ellipse( frame, center, Size( (*i).width/2, (*i).height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
+                      rectangle(frame_face, Point((*i).x, (*i).y), Point((*i).x + (*i).width, (*i).y + (*i).height),
+                        Scalar( 0, 0, 255 ), 4, 8);
+                      //检测到多个人脸，且如果尺寸过小
+                      if(faces.size()>1 &&((*i).width<100 ||(*i).height<100)){
+                          i=faces.erase(i);
+                      }else {
+                          i++;
+                      }
+                  }
                    vector< vector<Point2f> > landmarks;
                        // Run landmark detector
                        bool success = facemark->fit(frame_face,faces,landmarks);
@@ -317,8 +343,8 @@ void HR_cat_2::btn3_clicked()
 
                          }
                        }
-                   selection = Rect(100,100,100,100);//这句话是将frame帧图片中的选中矩形区域的地址指向
-                   ROI_next=frame_face(selection);
+     Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+                   ROI_next=frame_face(face);
                    next=ROI_next;
 
                    k++;
@@ -329,7 +355,8 @@ void HR_cat_2::btn3_clicked()
                    ShowVec(corr2_array);
 
 }
-//              cvtColor(frame_face, frame2, COLOR_BGR2RGB);
+              //337
+              cvtColor(frame_face, frame2, COLOR_BGR2RGB);
 //              QImage img1((const uchar*)frame2.data,
 //                         frame2.cols, frame2.rows,
 //                         frame2.cols * frame2.channels(),
@@ -340,6 +367,7 @@ void HR_cat_2::btn3_clicked()
 //               imwrite(Img_Name,frame_face);
 //               k++;
                cvtColor(frame_face, frame2, COLOR_BGR2RGB);
+               rectangle(frame2,face,Scalar(255, 0, 0),2,8,0);
                namedWindow("frame_face",0);
                imshow("frame_face",frame_face);
                waitKey(3);
@@ -350,12 +378,25 @@ void HR_cat_2::btn3_clicked()
                ui->label->setPixmap(QPixmap::fromImage(imagexxx));
                ui->label->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
 
-               QImage imageyyy((const uchar*)cur.data,
-                         cur.cols, cur.rows,
-                         cur.cols * cur.channels(),
-                         QImage::Format_RGB888);
-               ui->label2->setPixmap(QPixmap::fromImage(imageyyy));
-               ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+//               QImage imageyyy((const uchar*)cur.data,
+//                         cur.cols, cur.rows,
+//                         cur.cols * cur.channels(),
+//                         QImage::Format_RGB888);
+//               ui->label2->setPixmap(QPixmap::fromImage(imageyyy));
+//               ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+                //frame3来存储与face1做相与运算后的图像，frame4用作图像格式转换
+
+              Mat frame3;
+              cvtColor(cur, frame3, COLOR_BGR2RGB);
+
+               //img2就是我们要显示的
+               QImage img2((const uchar*)frame3.data,
+                          frame3.cols, frame3.rows,
+                          frame3.cols * frame3.channels(),
+                          QImage::Format_RGB888);
+                 ui->label2->setPixmap(QPixmap::fromImage(img2));
+                 ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
+
        if( waitKey(10) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
            //考虑用定时器重构，但是很多架构都要改变
 
