@@ -122,6 +122,11 @@ font: 75 18pt &quot;Marker Felt&quot;;</string>
       <string>Online_Camera</string>
      </property>
     </item>
+    <item>
+     <property name="text">
+      <string>face</string>
+     </property>
+    </item>
    </widget>
    <widget class="QtCharts::QChartView" name="graphicsView">
     <property name="geometry">

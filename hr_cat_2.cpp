@@ -25,7 +25,10 @@ QSplineSeries* series;
 QLineSeries* series_fft;
 QLineSeries* max_paint;
 QChart *chart_fft;
-
+QValueAxis *axisX;
+QValueAxis *axisY;
+//全局变量，采样点数
+int sampling_numbers;
  int timerId;
  int timerId_time;
  int timeId_fft;
@@ -62,13 +65,16 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
 
                            ui->graphicsView->setChart(chart);
 //                         ui->graphicsView->setRenderHint(QPainter::Antialiasing);
-                           QValueAxis *axisX = new QValueAxis;
-                           axisX->setRange(0,512);
+                           axisX = new QValueAxis;
+                           //corr2画点
+
+
                            axisX->setLabelFormat("%g");
                            axisX->setTitleText("Image_Frames");
 
-                           QValueAxis *axisY = new QValueAxis;
-                           axisY->setRange(0,1);
+                           axisY = new QValueAxis;
+                           //corr2画点
+                           //神奇 可以直接设置坐标点这个 用来完成间隔法来做
                            axisY->setTitleText("Correlation_Coefficent");
 
 
@@ -88,9 +94,10 @@ HR_cat_2::HR_cat_2(QWidget *parent) :
                            chart->setAxisY(axisY,series);
                            chart->legend()->hide();
                            chart->setTitle("Correlation Coefficient Waveform");
-                           timerId = startTimer(10);
-                           timerId_time=startTimer(20);
-                           timeId_fft=startTimer(20);
+                           //可以通过定时器来控制更新频率控制运行时间 具体可实验
+                           timerId = startTimer(50);//相关系数更新
+                           timerId_time=startTimer(50);//时间更新
+                           timeId_fft=startTimer(50);//频谱计算更新
 
 
 
@@ -162,46 +169,50 @@ void HR_cat_2::drawLandmarks(Mat &im, vector<Point2f> &landmarks)
 }
 
 
-int k=0;
 
 void HR_cat_2::btn3_clicked()
 {
+
+
+
     if( !face_cascade.load("/usr/local/Cellar/opencv/3.4.1_5/share/OpenCV/haarcascades/haarcascade_frontalface_alt2.xml") )
            cout << "--(!)Error loading face cascade\n";
     facemark = face::FacemarkLBF::create();
-
         // Load landmark detector
         facemark->loadModel("/Users/yanyupeng/GSOC2017/data/lbfmodel.yaml");
-
     cap.open(0);
     bool stop = false;
     Mat ROI,ROI_next;
-
-   std::vector<Mat> channels;
-   Mat  imageBlueChannel;
-
    //用来存储相邻两针图像矩阵
    Mat cur,next;
    //**很重要！！！！*
    //这里原本是用index来做标示，超过200 开始傅立叶变换但是发现会闪退，可能是vector std库函数的原因
    //用了vecto.size()做标示，可以
-
-   Mat tmp,last;
+   Mat last;
    last = NULL;
-   int frameNum=0;
-   Mat test;
+   int k=0;
+   UIupdate();
+   sampling_numbers=64;
+   axisX->setRange(0,2*sampling_numbers);
+   axisY->setRange(0,1);
    cap >> frame_face;
-   k++;
 
-   cout<<"捕获当前帧:"<<++frameNum<<endl;
+   cout<<"捕获当前帧:"<<++k<<endl;
 
    Mat gray, frame1, frame2;
    vector<Rect> faces;
+   Rect face;
    cvtColor(frame_face, gray, COLOR_BGR2GRAY);
    cvtColor(frame_face, frame1, COLOR_BGR2RGB);
 
    equalizeHist(gray, gray);
    //-- Detect faces
+  while(faces.size()==0){
+       cap >> frame_face;
+       cvtColor(frame_face, gray, COLOR_BGR2GRAY);
+       cvtColor(frame_face, frame1, COLOR_BGR2RGB);
+       face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
+   }
    face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
     vector<Rect>::iterator i;
    for (  i = faces.begin(); i!=faces.end();)
@@ -229,25 +240,21 @@ void HR_cat_2::btn3_clicked()
 
          }
        }
-   //这个选择很重要
-//    selection = Rect(100,100,10,10);//这句话是将frame帧图片中的选中矩形区域的地址指向ROI
-       //通过人脸特征点划定某个区域为ROI
-       //进行伪人脸去除
 
-
-     Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+    // face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
       //face向量队列中存储着检测到的人脸，一般为1，可以设定重复标定值，有时候是2可取第一个。
+     face=Rect(landmarks[0].at(36).x,landmarks[0].at(33).y,50,50);
 
-
+ clock_t start,end;
    while(!stop)
    {
-              clock_t start,end;
+
               start=clock();
 
                ROI=frame_face(face);
                namedWindow("frame_face",0);
                imshow("frame_face",frame_face);
-               waitKey(3);
+               waitKey(1);
 
                Mat mean_A;
                Mat stddev_1;
@@ -258,21 +265,23 @@ void HR_cat_2::btn3_clicked()
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
                    //corr2 画图 第一个值
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<512){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<sampling_numbers){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
 //                   bool flag2= cap.read(frame_face);
                    cap >> frame_face;
-                   cout<<"捕获下一帧:"<<++frameNum<<endl;
+                   cout<<"捕获下一帧:"<<++k<<endl;
                    cvtColor(frame_face, gray, COLOR_BGR2GRAY);
                    cvtColor(frame_face, frame1, COLOR_BGR2RGB);
-
                    equalizeHist(gray, gray);
                    //-- Detect faces
                    face_cascade.detectMultiScale( gray, faces, 1.1, 2, 0|CASCADE_SCALE_IMAGE, Size(60, 60) );
                    vector<Rect>::iterator i;
+                   //防止闪退
+                   if(faces.size()==0)
+                       continue;
+
                   for (  i = faces.begin(); i!=faces.end();)
                   {
-               //       ellipse( frame, center, Size( (*i).width/2, (*i).height/2 ), 0, 0, 360, Scalar( 0, 0, 255 ), 4, 8, 0 );
                       rectangle(frame_face, Point((*i).x, (*i).y), Point((*i).x + (*i).width, (*i).y + (*i).height),
                         Scalar( 0, 0, 255 ), 4, 8);
                       //检测到多个人脸，且如果尺寸过小
@@ -295,22 +304,23 @@ void HR_cat_2::btn3_clicked()
 
                          }
                        }
-  //替代selection
-   Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+
+//     face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+   face=Rect(landmarks[0].at(36).x,landmarks[0].at(33).y,50,50);
 
                    ROI_next = frame_face(face);
                    next=ROI_next;
                    double index=corr2(cur,next);
                    corr2_array.push_back(index);
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
-                   k++;
+
                } else{
-                   //这里的逻辑应该是把第一个元素去掉 加进来第200号元素，变换
+                   //这里的逻辑应该是把第一个元素去掉 加进来第64号元素，变换
                    corr2_array.erase(corr2_array.begin());
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
-//                   bool flag3= cap.read(frame_face);
-//                   cout<<"捕获下一帧:"<<flag3<<++frameNum<<endl;
-                   cap >> frame_face;
+                  bool flag3= cap.read(frame_face);
+                  cout<<"捕获下一帧:"<<flag3<<++k<<endl;
+                  cap >> frame_face;
                    cvtColor(frame_face, gray, COLOR_BGR2GRAY);
                    cvtColor(frame_face, frame1, COLOR_BGR2RGB);
 
@@ -343,11 +353,12 @@ void HR_cat_2::btn3_clicked()
 
                          }
                        }
-     Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+//     Rect face=Rect((landmarks[0].at(17).x+landmarks[0].at(4).x)/2,(landmarks[0].at(17).y+landmarks[0].at(4).y)/2,30,30);
+       face=Rect(landmarks[0].at(36).x,landmarks[0].at(33).y,50,50);
+
                    ROI_next=frame_face(face);
                    next=ROI_next;
 
-                   k++;
                    corr2_array.push_back(corr2(cur,next));
                    //傅立叶变换
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
@@ -356,48 +367,24 @@ void HR_cat_2::btn3_clicked()
 
 }
               //337
-              cvtColor(frame_face, frame2, COLOR_BGR2RGB);
-//              QImage img1((const uchar*)frame2.data,
-//                         frame2.cols, frame2.rows,
-//                         frame2.cols * frame2.channels(),
-//                         QImage::Format_RGB888);
-//              ui->label2->setPixmap(QPixmap::fromImage(img1));
-//               ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
-//               string Img_Name = "/Users/yanyupeng/Desktop/pic/" +to_string(k)+".bmp";
-//               imwrite(Img_Name,frame_face);
-//               k++;
-               cvtColor(frame_face, frame2, COLOR_BGR2RGB);
-               rectangle(frame2,face,Scalar(255, 0, 0),2,8,0);
-               namedWindow("frame_face",0);
-               imshow("frame_face",frame_face);
-               waitKey(3);
-               QImage imagexxx((const uchar*)frame2.data,
-                         frame2.cols, frame2.rows,
-                         frame2.cols * frame2.channels(),
-                         QImage::Format_RGB888);
-               ui->label->setPixmap(QPixmap::fromImage(imagexxx));
+
+
+               string Img_Name = "/Users/yanyupeng/Desktop/pic/" +to_string(k)+".bmp";
+               imwrite(Img_Name,frame_face);
+
+
+               rectangle(frame_face,face,Scalar(255, 0, 0),2,8,0);
+
+             QImage img1=MatToQImage(frame_face);
+               ui->label->setPixmap(QPixmap::fromImage(img1));
                ui->label->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
 
-//               QImage imageyyy((const uchar*)cur.data,
-//                         cur.cols, cur.rows,
-//                         cur.cols * cur.channels(),
-//                         QImage::Format_RGB888);
-//               ui->label2->setPixmap(QPixmap::fromImage(imageyyy));
-//               ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
-                //frame3来存储与face1做相与运算后的图像，frame4用作图像格式转换
 
-              Mat frame3;
-              cvtColor(cur, frame3, COLOR_BGR2RGB);
-
-               //img2就是我们要显示的
-               QImage img2((const uchar*)frame3.data,
-                          frame3.cols, frame3.rows,
-                          frame3.cols * frame3.channels(),
-                          QImage::Format_RGB888);
+               QImage img2=MatToQImage(cur);
                  ui->label2->setPixmap(QPixmap::fromImage(img2));
                  ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
 
-       if( waitKey(10) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
+       if( waitKey(1) == 27 )//ESC键退出 ，一个while循环的运行事件和30ms相比是不是可以忽略？
            //考虑用定时器重构，但是很多架构都要改变
 
            stop = true;
@@ -407,14 +394,9 @@ void HR_cat_2::btn3_clicked()
 
 
 
-
-
-//    cap >> frame_face;
-
-
 }
 
-
+//UIupdate 是针对FFT图的
 
 void HR_cat_2::UIupdate(){
     QLinearGradient backgroundGradient;
@@ -481,7 +463,7 @@ void HR_cat_2::UIupdate(){
         chart_fft->legend()->hide();
 //                           chart_fft->setTitle("fft_display");
 
-        axisX_fft->setRange(100,300);
+//        axisX_fft->setRange(100,300);
         axisX_fft->setTickCount(11);
         update();
 
@@ -701,7 +683,7 @@ int HR_cat_2::btn2_clicked(){
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
                    //corr2 画图 第一个值
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<512){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<sampling_numbers){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
                    cout<<"捕获下一帧:"<<++frameNum<<endl;
@@ -801,15 +783,28 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
 
         //test
 
+        if(ui->comboBox->currentIndex()==1){
+            size=7168;
+            sampling_numbers=512;
+            cout<<"sam"<<sampling_numbers<<endl;
+        }else if(ui->comboBox->currentIndex()==2){
+            sampling_numbers=256;
+            cout<<"sam"<<sampling_numbers<<endl;
 
-         if(ave_corr2.size()>511){
-             for(int i=512;i<7168;i++){
+            size=2048;
+        }else  if(ui->comboBox->currentIndex()==3){
+        sampling_numbers=64;
+        cout<<"sam"<<sampling_numbers<<endl;
+        size=512;}
+
+          //条件，已经采集到了超过256 512 的点，开始做fft
+        //note::这里有个-1 很重要，否则条件不通过下面不运行
+         if(ave_corr2.size()>sampling_numbers-1){
+             for(int i=sampling_numbers;i<size;i++){
                  ave_corr2.push_back(0);
              }
+           //实际傅立叶变换的点数，插值后
 
-             if(ui->comboBox->currentIndex()==1){
-                 size=7168;
-             }
          fftw_complex x[size];
          fftw_complex y[size];
          vector<double> amplitude;
@@ -834,10 +829,10 @@ void HR_cat_2::timerEvent(QTimerEvent *event) {
           vector<double>::iterator biggest = std::max_element(std::begin(amplitude_1), std::end(amplitude_1));
           //最大值的位置
           int max_position=std::distance(std::begin(amplitude_1), biggest);
-          ui->label_4->setText("Heart Rate Frequency is    "+QString::number((float)max_position*60/7168,'f', 3)+"Hz");
+          ui->label_4->setText("Heart Rate Frequency is    "+QString::number((float)max_position*60/size,'f', 3)+"Hz");
           cout<<"最大值是"<<max_position<<endl;
           cout << "Max element is " << *biggest<< " at position " << max_position << std::endl;
-          double HR_rate= distance(std::begin(amplitude_1), biggest)*60*60/7168.0;
+          double HR_rate= distance(std::begin(amplitude_1), biggest)*60.0*60/size;
 
 //          max->append((int)*biggest,(int)amplitude_1[*biggest]);
 
@@ -891,7 +886,13 @@ void HR_cat_2::video_dealing_chosing(){
 
     if(ui->comboBox->currentIndex()==1){
       //单独调用结构清晰，功能独立完成，具体在btn2_clicked中完成
+        //corr2坐标系刻度初始化
+         sampling_numbers=512;
+
        UIupdate();
+       axisX->setRange(0,sampling_numbers);
+       axisY->setRange(0,1);
+
        btn2_clicked();
 
 
@@ -899,9 +900,17 @@ void HR_cat_2::video_dealing_chosing(){
 
     }else if(ui->comboBox->currentIndex()==2){
         //单独调用结构清晰，功能独立完成，具体在btn1_clicked中完成
+        //这里也需要一个UIupdate1完成心率检测时的相关功能，由于不同帧率下，做fft变换的采集点不同，采集点采用全局变量处理，
+        //然后在这里具体指定。
+        sampling_numbers=256;
+          UIupdate();
+        axisX->setRange(0,sampling_numbers);
+        axisY->setRange(0,1);
+
          btn1_clicked();
 
-      }
+    }
+
 }
 
 int HR_cat_2::btn1_clicked(){
@@ -930,26 +939,13 @@ int HR_cat_2::btn1_clicked(){
    //**很重要！！！！*
    //这里原本是用index来做标示，超过200 开始傅立叶变换但是发现会闪退，可能是vector std库函数的原因
    //用了vecto.size()做标示，可以
-
+   int frameNum=0;
    Mat tmp,last;
    last = NULL;
-//   while(!stop)
-//   {
-//       cap.read(tmp);
-//       cur = tmp(selection);
-//       double cor;
-//       if(corr2_array.size()!=0)
-//       {
-//           cor = corr2(last,cur);
-//           corr2_array.push_back(cor);
-//       }
-//       else
-//       {
-//           corr2_array.push_back(1.0);
-//       }
-//       last = cur.clone();
-//       cout<<cor<<endl;
-//   }
+   bool flag1= cap.read(frame);
+
+   cout<<"捕获当前帧:"<<++frameNum<<endl;
+
 
    while(!stop)
    {
@@ -964,7 +960,7 @@ int HR_cat_2::btn1_clicked(){
                //一个内存来进行操作
                //当然所截图的矩形区域ROI，可以使用imwrite函数来保存
                //这里只是为了显示的比较直观
-               bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
+//               bitwise_not(ROI, ROI);//bitwise_not为将每一个bit位取反
                Mat mean_A;
                Mat stddev_1;
                meanStdDev(ROI,mean_A,stddev_1);
@@ -976,13 +972,13 @@ int HR_cat_2::btn1_clicked(){
                    cur=next=ROI;
                    corr2_array.push_back(1);
                    cout<<"the first 相关系数个数为："<<corr2_array.size()<<endl;
-               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<512){
+               }else if(value_A!=0 && corr2_array.size()>0 && corr2_array.size()<sampling_numbers){
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag2= cap.read(frame);
-                   cout<<"捕获下一帧:"<<flag2<<endl;
+                   cout<<"捕获下一帧:"<<++frameNum<<endl;
                    ROI_next = frame(selection);
                    next=ROI_next;
-                   int index=corr2(cur,next);
+                   double index=corr2(cur,next);
                    corr2_array.push_back(index);
                    cout<<"相关系数个数为："<<corr2_array.size()<<endl;
                } else{
@@ -990,7 +986,7 @@ int HR_cat_2::btn1_clicked(){
                    corr2_array.erase(corr2_array.begin());
                    cur=next.clone();// = capy clone 在内存地址的操作很不一样!!!十天
                    bool flag3= cap.read(frame);
-                   cout<<"捕获下一帧:"<<flag3<<endl;
+                   cout<<"捕获下一帧:"<<++frameNum<<endl;
                    ROI_next = frame(selection);
                    next=ROI_next;
                    corr2_array.push_back(corr2(cur,next));
@@ -999,7 +995,9 @@ int HR_cat_2::btn1_clicked(){
                    //接下来准备做傅立叶
                    //减均值,先不做 容易导致corr2_array超载
 }
-
+                    rectangle(frame,selection,Scalar(255, 0, 0),2,8,0);
+                     //出现两条蓝色叠线的原因是因为frame已经画过线了
+                    rectangle(cur,selection,Scalar(255, 0,0),2,8,0);
 
 
 
@@ -1010,9 +1008,6 @@ int HR_cat_2::btn1_clicked(){
       image=MatToQImage(cur);
       ui->label2->setScaledContents(true);//很重要，通过这个设置可以使label自适应显示图片
       ui->label2->setPixmap(QPixmap::fromImage(image));//将视频显示到label上
-
-
-
 
       end=clock();
       std::cout<<"time is:"<<(double)(end -start)/CLOCKS_PER_SEC<<std::endl;
